@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "662940128104",
+    "project_id": "captain-fc0f1",
+    "storage_bucket": "captain-fc0f1.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:662940128104:android:a1422fa01357c8da90bcdd",
+        "android_client_info": {
+          "package_name": "com.captainmasala.captain_masala"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBWWUt_XhEnWl5pG8XsnuQKOHZUg8H6aO4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
