@@ -23,16 +23,53 @@ class ReportsScreen extends StatefulWidget {
 
 class _ReportsScreenState extends State<ReportsScreen> {
   bool _isGenerating = false;
-  DateTime _selectedDate = DateTime.now();
+  String _selectedFilter = 'Daily';
+  DateTime? _startDate;
+  DateTime? _endDate;
+  final List<String> _filters = ['Daily', 'Weekly', 'Monthly', 'Custom'];
 
-  Future<void> _selectDate(BuildContext context) async {
-    final DateTime? picked = await showDatePicker(
+  @override
+  void initState() {
+    super.initState();
+    _calculateDatesForFilter(_selectedFilter);
+  }
+
+  void _calculateDatesForFilter(String filter) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day); 
+
+    setState(() {
+      _selectedFilter = filter;
+      switch (filter) {
+        case 'Daily':
+          _startDate = today;
+          _endDate = today;
+          break;
+        case 'Weekly':
+          final int daysToSubtract = today.weekday == 7 ? 6 : today.weekday - 1; // Start of week (Monday)
+          _startDate = today.subtract(Duration(days: daysToSubtract));
+          _endDate = today;
+          break;
+        case 'Monthly':
+          _startDate = DateTime(today.year, today.month, 1);
+          _endDate = today;
+          break;
+        case 'Custom':
+          break;
+      }
+    });
+  }
+
+  Future<void> _selectCustomDateRange(BuildContext context) async {
+    final DateTimeRange? picked = await showDateRangePicker(
       context: context,
-      initialDate: _selectedDate,
       firstDate: DateTime(2020),
       lastDate: DateTime(2030),
+      initialDateRange: (_startDate != null && _endDate != null)
+          ? DateTimeRange(start: _startDate!, end: _endDate!)
+          : null,
       builder: (context, child) {
-        return Theme(
+         return Theme(
           data: Theme.of(context).copyWith(
             colorScheme: const ColorScheme.light(
               primary: AppColors.primaryRed,
@@ -44,34 +81,41 @@ class _ReportsScreenState extends State<ReportsScreen> {
         );
       },
     );
-    if (picked != null && picked != _selectedDate) {
+
+    if (picked != null) {
       setState(() {
-        _selectedDate = picked;
+        _selectedFilter = 'Custom';
+        _startDate = picked.start;
+        _endDate = picked.end;
       });
+    } else {
+      if (_startDate == null || _endDate == null) {
+        _calculateDatesForFilter('Daily');
+      }
     }
   }
 
-  Future<void> _generateReport(String period, String format) async {
+  String get _formattedDateRange {
+    if (_startDate == null || _endDate == null) return 'Select a date range';
+    final formatter = DateFormat('MMM dd, yyyy');
+    if (_startDate == _endDate) {
+      return formatter.format(_startDate!);
+    }
+    return '${formatter.format(_startDate!)} - ${formatter.format(_endDate!)}';
+  }
+
+  bool get _isDownloadReady {
+    return _startDate != null && _endDate != null;
+  }
+
+  Future<void> _generateReport(String format) async {
+    if (!_isDownloadReady) return;
     setState(() => _isGenerating = true);
     try {
       final db = Provider.of<DatabaseService>(context, listen: false);
-      DateTime filterStartDate;
-      DateTime filterEndDate;
-      
-      if (period == 'Daily') {
-        filterStartDate = DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day);
-        filterEndDate = filterStartDate.add(const Duration(days: 1));
-      } else if (period == 'Weekly') {
-        final int daysToSubtract = _selectedDate.weekday == 7 ? 0 : _selectedDate.weekday;
-        filterStartDate = DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day).subtract(Duration(days: daysToSubtract));
-        filterEndDate = filterStartDate.add(const Duration(days: 7));
-      } else if (period == 'Monthly') {
-        filterStartDate = DateTime(_selectedDate.year, _selectedDate.month, 1);
-        filterEndDate = DateTime(_selectedDate.year, _selectedDate.month + 1, 1);
-      } else {
-        filterStartDate = DateTime(_selectedDate.year, 1, 1);
-        filterEndDate = DateTime(_selectedDate.year + 1, 1, 1);
-      }
+      DateTime filterStartDate = DateTime(_startDate!.year, _startDate!.month, _startDate!.day);
+      DateTime filterEndDate = DateTime(_endDate!.year, _endDate!.month, _endDate!.day, 23, 59, 59, 999);
+      String period = _selectedFilter == 'Custom' ? _formattedDateRange : _selectedFilter;
 
       var filteredSales = db.sales.where((s) => s.dateTime.isAfter(filterStartDate) && s.dateTime.isBefore(filterEndDate)).toList();
 
@@ -120,7 +164,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
           }
         }
         final directory = await getTemporaryDirectory();
-        path = '${directory.path}/captain_masala_${period.toLowerCase()}_report.csv';
+        final safePeriod = period.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '_');
+        path = '${directory.path}/captain_masala_${safePeriod}_report.csv';
         final file = File(path);
         await file.writeAsString(buffer.toString());
       }
@@ -186,75 +231,6 @@ class _ReportsScreenState extends State<ReportsScreen> {
     );
   }
 
-  Widget _buildReportCard(String title, String subtitle, IconData icon, String period) {
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: AppColors.primaryRed.withOpacity(0.1),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(icon, color: AppColors.primaryRed, size: 28),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                      const SizedBox(height: 4),
-                      Text(subtitle, style: const TextStyle(color: AppColors.textLight, fontSize: 13)),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
-            Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: _isGenerating ? null : () => _generateReport(period, 'pdf'),
-                    icon: const Icon(Icons.picture_as_pdf, size: 18),
-                    label: const Text('Download PDF'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primaryRed,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: _isGenerating ? null : () => _generateReport(period, 'csv'),
-                    icon: const Icon(Icons.table_chart, size: 18),
-                    label: const Text('Download CSV'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primaryGreen,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final db = Provider.of<DatabaseService>(context);
@@ -282,29 +258,104 @@ class _ReportsScreenState extends State<ReportsScreen> {
                 _buildInteractiveReportCard(context),
               ],
               const SizedBox(height: 32),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text('Export Documents', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: AppColors.textDark)),
-                  OutlinedButton.icon(
-                    onPressed: () => _selectDate(context),
-                    icon: const Icon(Icons.calendar_today, size: 16),
-                    label: Text(DateFormat('MMM d, yyyy').format(_selectedDate)),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppColors.primaryRed,
-                      side: const BorderSide(color: AppColors.primaryRed),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    ),
+              const Text('Export Documents', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: AppColors.textDark)),
+              const SizedBox(height: 16),
+              Card(
+                elevation: 2,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Wrap(
+                        spacing: 8.0,
+                        runSpacing: 8.0,
+                        children: _filters.map((filter) {
+                          final isSelected = _selectedFilter == filter;
+                          return ChoiceChip(
+                            label: Text(filter),
+                            selected: isSelected,
+                            selectedColor: AppColors.primaryRed.withOpacity(0.2),
+                            labelStyle: TextStyle(
+                              color: isSelected ? AppColors.primaryRed : AppColors.textDark,
+                              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                            ),
+                            onSelected: (selected) {
+                              if (selected) {
+                                if (filter == 'Custom') {
+                                  _selectCustomDateRange(context);
+                                } else {
+                                  _calculateDatesForFilter(filter);
+                                }
+                              }
+                            },
+                          );
+                        }).toList(),
+                      ),
+                      const SizedBox(height: 16),
+                      InkWell(
+                        onTap: () => _selectCustomDateRange(context),
+                        borderRadius: BorderRadius.circular(8),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Colors.grey.shade300),
+                            borderRadius: BorderRadius.circular(8),
+                            color: Colors.grey.shade50,
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.calendar_today, size: 20, color: Colors.grey),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  _formattedDateRange,
+                                  style: const TextStyle(fontWeight: FontWeight.w500),
+                                ),
+                              ),
+                              if (_selectedFilter == 'Custom')
+                                const Icon(Icons.edit, size: 18, color: AppColors.primaryRed),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              onPressed: (!_isGenerating && _isDownloadReady) ? () => _generateReport('pdf') : null,
+                              icon: const Icon(Icons.picture_as_pdf, size: 18),
+                              label: const Text('PDF'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.primaryRed,
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              onPressed: (!_isGenerating && _isDownloadReady) ? () => _generateReport('csv') : null,
+                              icon: const Icon(Icons.table_chart, size: 18),
+                              label: const Text('CSV'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.primaryGreen,
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
-              const SizedBox(height: 16),
-              _buildReportCard('Daily Report', "Today's transactions", Icons.today, 'Daily'),
-              const SizedBox(height: 16),
-              _buildReportCard('Weekly Report', 'Transactions from the last 7 days', Icons.date_range, 'Weekly'),
-              const SizedBox(height: 16),
-              _buildReportCard('Monthly Report', 'All transactions for the current month', Icons.calendar_month, 'Monthly'),
             ],
           ),
         ),
