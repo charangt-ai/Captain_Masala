@@ -173,4 +173,22 @@ router.put('/:id/role', protect, admin, async (req, res) => {
   }
 });
 
+// @desc    Delete user account completely
+// @route   DELETE /api/users/:id
+// @access  Private/Admin
+router.delete('/:id', protect, admin, async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+    if (user) {
+      await User.findByIdAndDelete(req.params.id);
+      res.json({ message: 'User completely deleted' });
+    } else {
+      res.status(404).json({ message: 'User not found' });
+    }
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 module.exports = router;
