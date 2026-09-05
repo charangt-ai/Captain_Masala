@@ -63,18 +63,13 @@ router.post('/login', async (req, res) => {
   const isUsername = !usernameOrEmail.includes('@');
 
   try {
-    let user;
-    if (usernameOrEmail.toLowerCase() === 'admin' || usernameOrEmail.toLowerCase() === 'superadmin') {
-      user = await User.findOne({ email: 'admin@captainmasala.com' });
-    } else {
-      user = await User.findOne({
-        $or: [
-          { email: usernameOrEmail.toLowerCase() },
-          { username: { $regex: new RegExp(`^${usernameOrEmail}$`, 'i') } },
-          { name: { $regex: new RegExp(`^${usernameOrEmail}$`, 'i') } }
-        ]
-      });
-    }
+    const user = await User.findOne({
+      $or: [
+        { email: usernameOrEmail.toLowerCase() },
+        { username: { $regex: new RegExp(`^${usernameOrEmail}$`, 'i') } },
+        { name: { $regex: new RegExp(`^${usernameOrEmail}$`, 'i') } }
+      ]
+    });
 
     if (user && (await user.matchPassword(password))) {
       res.json({
