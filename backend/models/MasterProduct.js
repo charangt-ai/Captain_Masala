@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 
 const masterProductSchema = new mongoose.Schema({
-  _id: { type: String, required: true },
+  _id: { type: String, required: true, default: () => new mongoose.Types.ObjectId().toString() },
   name: { type: String, required: true },
   totalStockKg: { type: Number, default: 0.0 },
 }, { timestamps: true });

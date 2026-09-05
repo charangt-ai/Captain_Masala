@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 
 const inventoryLogSchema = new mongoose.Schema({
-  _id: { type: String, required: true },
+  _id: { type: String, required: true, default: () => new mongoose.Types.ObjectId().toString() },
   productId: { type: String, required: true },
   productName: { type: String, required: true },
   changeQuantity: { type: Number, required: true },

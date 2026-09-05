@@ -10,7 +10,7 @@ const saleItemSchema = new mongoose.Schema({
 });
 
 const saleSchema = new mongoose.Schema({
-  _id: { type: String, required: true },
+  _id: { type: String, required: true, default: () => new mongoose.Types.ObjectId().toString() },
   invoiceNumber: { type: String, required: true },
   customerId: { type: String, required: true },
   customerName: { type: String, required: true },
