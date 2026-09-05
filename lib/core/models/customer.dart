@@ -11,6 +11,10 @@ class Customer {
   final String shopImageUrl;
   final double? latitude;
   final double? longitude;
+  final DateTime? lastPurchaseDate;
+  final double totalSpent;
+  final String? handledById;
+  final String? handledByName;
 
   Customer({
     required this.id,
@@ -25,6 +29,10 @@ class Customer {
     this.shopImageUrl = '',
     this.latitude,
     this.longitude,
+    this.lastPurchaseDate,
+    this.totalSpent = 0.0,
+    this.handledById,
+    this.handledByName,
   });
 
   Map<String, dynamic> toMap() {
@@ -41,6 +49,10 @@ class Customer {
       'shopImageUrl': shopImageUrl,
       'latitude': latitude,
       'longitude': longitude,
+      'lastPurchaseDate': lastPurchaseDate?.toIso8601String(),
+      'totalSpent': totalSpent,
+      'handledById': handledById,
+      'handledByName': handledByName,
     };
   }
 
@@ -58,6 +70,10 @@ class Customer {
       shopImageUrl: map['shopImageUrl'] ?? '',
       latitude: map['latitude'] != null ? (map['latitude'] as num).toDouble() : null,
       longitude: map['longitude'] != null ? (map['longitude'] as num).toDouble() : null,
+      lastPurchaseDate: map['lastPurchaseDate'] != null ? DateTime.tryParse(map['lastPurchaseDate']) : null,
+      totalSpent: map['totalSpent'] != null ? (map['totalSpent'] as num).toDouble() : 0.0,
+      handledById: map['handledById'],
+      handledByName: map['handledByName'],
     );
   }
 }

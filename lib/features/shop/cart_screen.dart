@@ -73,6 +73,7 @@ class _CartScreenState extends State<CartScreen> {
       sellerName: db.currentUserProfile?.username.isNotEmpty == true 
           ? db.currentUserProfile!.username 
           : (db.currentUserProfile?.email ?? 'Unknown Seller'),
+      sellerRole: db.currentUserProfile?.role,
       items: saleItems,
       totalAmount: totalAmount + discount,
       discount: discount,
@@ -85,11 +86,18 @@ class _CartScreenState extends State<CartScreen> {
     );
 
     try {
-      await db.recordSale(sale);
-      cart.clearCart();
+      final success = await db.recordSale(sale);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Sale successful! $invoiceNumber')));
-        Navigator.of(context).popUntil((route) => route.isFirst);
+        if (success) {
+          cart.clearCart();
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Sale successful! $invoiceNumber')));
+          Navigator.of(context).popUntil((route) => route.isFirst);
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('Failed to record sale. Check database permissions.'),
+            backgroundColor: Colors.red,
+          ));
+        }
       }
     } catch (e) {
       if (mounted) {

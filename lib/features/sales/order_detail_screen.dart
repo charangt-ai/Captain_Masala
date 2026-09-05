@@ -7,6 +7,7 @@ import '../../core/models/customer.dart';
 import '../../core/models/sale.dart';
 import '../../core/services/database_service.dart';
 import '../../core/theme.dart';
+import '../../core/permissions.dart';
 import 'invoice_generator.dart';
 import 'sales_entry_screen.dart';
 
@@ -112,7 +113,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     final currentUserRole = db.currentUserProfile?.role ?? '';
     bool canEditOrder = true;
     if (isPaid) {
-      canEditOrder = currentUserRole == 'super_admin';
+      canEditOrder = Permissions.canEditOrder(currentUserRole);
     }
 
     return Scaffold(
@@ -137,11 +138,13 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     ),
                     const SizedBox(height: 4),
                     Text(DateFormat('dd MMM yyyy, hh:mm a').format(sale.dateTime)),
+                    const SizedBox(height: 4),
+                    Text('Handled by: ${sale.sellerName}${sale.sellerRole != null ? ' - ${sale.sellerRole}' : ''}', style: const TextStyle(fontSize: 12, color: Colors.grey)),
                   ],
                 ),
                 if (isCancelled)
                   _buildStatusBadge('Cancelled')
-                else if (db.currentUserProfile?.role == 'delivery')
+                else if (db.currentUserProfile?.role != 'pending')
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                     decoration: BoxDecoration(
@@ -301,7 +304,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               const Text('Order Actions', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
               const SizedBox(height: 12),
               
-              if (!isDelivered && db.currentUserProfile?.role == 'delivery')
+              if (!isDelivered && db.currentUserProfile?.role != 'pending')
                 ElevatedButton.icon(
                   onPressed: () => _showMarkDeliveredDialog(db),
                   icon: const Icon(Icons.local_shipping),
@@ -371,7 +374,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                           sale,
                           customerPhone: customer?.mobileNumber ?? sale.phone,
                           customerAddress: customer != null ? '${customer.address}, ${customer.city} - ${customer.district}' : '',
-                          showDeliveryStatus: db.currentUserProfile?.role == 'delivery',
+                          showDeliveryStatus: db.currentUserProfile?.role != 'pending',
                         );
                         if (context.mounted) {
                           final xFile = XFile(file.path, mimeType: 'application/pdf');
@@ -405,7 +408,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                           sale,
                           customerPhone: customer?.mobileNumber ?? sale.phone,
                           customerAddress: customer != null ? '${customer.address}, ${customer.city} - ${customer.district}' : '',
-                          showDeliveryStatus: db.currentUserProfile?.role == 'delivery',
+                          showDeliveryStatus: db.currentUserProfile?.role != 'pending',
                         );
                         if (context.mounted) {
                           final xFile = XFile(file.path, mimeType: 'application/pdf');

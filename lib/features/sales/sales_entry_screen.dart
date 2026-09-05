@@ -162,6 +162,7 @@ class _SalesEntryScreenState extends State<SalesEntryScreen> {
       sellerName: db.currentUserProfile?.username.isNotEmpty == true 
           ? db.currentUserProfile!.username 
           : (db.currentUserProfile?.email ?? 'Unknown Seller'),
+      sellerRole: db.currentUserProfile?.role,
       items: saleItems,
       totalAmount: _calculateSubtotal(),
       discount: _discount,
@@ -175,10 +176,25 @@ class _SalesEntryScreenState extends State<SalesEntryScreen> {
       updatedAt: DateTime.now(),
     );
 
-    if (widget.editSale != null) {
-      db.updateSale(sale);
-    } else {
-      db.recordSale(sale);
+    try {
+      if (widget.editSale != null) {
+        await db.updateSale(sale);
+      } else {
+        final success = await db.recordSale(sale);
+        if (!success) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Failed to record sale. Check database permissions.'), backgroundColor: Colors.red),
+          );
+          return;
+        }
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+      );
+      return;
     }
 
     // Generate Invoice PDF

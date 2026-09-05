@@ -1,9 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'dart:io';
+import 'dart:convert';
+import 'package:image_picker/image_picker.dart';
+import 'package:image/image.dart' as img;
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../../core/services/cart_service.dart';
 import '../../../core/services/database_service.dart';
 import '../../../core/models/product_category.dart';
 import '../../../core/theme.dart';
+import '../../../core/permissions.dart';
 import 'widgets/shop_search_bar.dart';
 import 'product_list_screen.dart';
 import 'cart_screen.dart';
@@ -85,7 +91,7 @@ class _CategoryListScreenState extends State<CategoryListScreen> {
   Widget _buildBody() {
     final db = Provider.of<DatabaseService>(context);
     final _categories = db.categories;
-    final isSuperAdmin = db.currentUserProfile?.role == 'super_admin';
+    final isSuperAdmin = Permissions.isSuperAdmin(db.currentUserProfile?.role);
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0),
@@ -174,9 +180,33 @@ class _CategoryListScreenState extends State<CategoryListScreen> {
                                   borderRadius: BorderRadius.circular(12),
                                   border: Border.all(color: Colors.grey.shade200, width: 2),
                                 ),
-                                child: const Center(
-                                  child: Icon(Icons.image_not_supported, size: 40, color: Colors.grey),
-                                ),
+                                child: cat.image.isNotEmpty
+                                    ? ClipRRect(
+                                        borderRadius: BorderRadius.circular(10),
+                                        child: cat.image.startsWith('data:image')
+                                            ? Image.memory(
+                                                base64Decode(cat.image.split(',')[1]),
+                                                fit: BoxFit.cover,
+                                                width: double.infinity,
+                                                errorBuilder: (context, error, stackTrace) => const Center(
+                                                  child: Icon(Icons.broken_image, size: 40, color: Colors.grey),
+                                                ),
+                                              )
+                                            : CachedNetworkImage(
+                                                imageUrl: cat.image,
+                                                fit: BoxFit.cover,
+                                                width: double.infinity,
+                                                placeholder: (context, url) => const Center(
+                                                  child: CircularProgressIndicator(),
+                                                ),
+                                                errorWidget: (context, url, error) => const Center(
+                                                  child: Icon(Icons.broken_image, size: 40, color: Colors.grey),
+                                                ),
+                                              ),
+                                      )
+                                    : const Center(
+                                        child: Icon(Icons.image_not_supported, size: 40, color: Colors.grey),
+                                      ),
                               ),
                             ),
                             const SizedBox(height: 8),
@@ -237,35 +267,120 @@ class _CategoryListScreenState extends State<CategoryListScreen> {
 
   void _showAddCategoryDialog(BuildContext context) {
     final TextEditingController nameController = TextEditingController();
+    File? selectedImage;
+    bool isUploading = false;
+
     showDialog(
       context: context,
+      barrierDismissible: false,
       builder: (context) {
-        return AlertDialog(
-          title: const Text('Add Category'),
-          content: TextField(
-            controller: nameController,
-            decoration: const InputDecoration(hintText: 'Category Name'),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                if (nameController.text.trim().isNotEmpty) {
-                  final db = Provider.of<DatabaseService>(context, listen: false);
-                  final newCat = ProductCategory(
-                    id: DateTime.now().millisecondsSinceEpoch.toString(),
-                    name: nameController.text.trim(),
-                  );
-                  db.addCategory(newCat);
-                  Navigator.pop(context);
-                }
-              },
-              child: const Text('Save'),
-            ),
-          ],
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: const Text('Add Category'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    GestureDetector(
+                      onTap: () async {
+                        final picker = ImagePicker();
+                        final pickedFile = await picker.pickImage(
+                          source: ImageSource.gallery,
+                          maxWidth: 400,
+                          maxHeight: 400,
+                          imageQuality: 60,
+                        );
+                        if (pickedFile != null) {
+                          setState(() {
+                            selectedImage = File(pickedFile.path);
+                          });
+                        }
+                      },
+                      child: Container(
+                        height: 100,
+                        width: 100,
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade200,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.grey.shade400),
+                        ),
+                        child: selectedImage != null
+                            ? ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: Image.file(selectedImage!, fit: BoxFit.cover),
+                              )
+                            : const Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.add_a_photo, color: Colors.grey),
+                                  SizedBox(height: 4),
+                                  Text('Add Photo', style: TextStyle(fontSize: 10, color: Colors.grey)),
+                                ],
+                              ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: nameController,
+                      decoration: const InputDecoration(hintText: 'Category Name'),
+                    ),
+                    if (isUploading) ...[
+                      const SizedBox(height: 16),
+                      const CircularProgressIndicator(),
+                    ],
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: isUploading ? null : () => Navigator.pop(context),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: isUploading ? null : () async {
+                    if (nameController.text.trim().isNotEmpty) {
+                      setState(() {
+                        isUploading = true;
+                      });
+                      final db = Provider.of<DatabaseService>(context, listen: false);
+                      final id = DateTime.now().millisecondsSinceEpoch.toString();
+                      String imageUrl = '';
+
+                      if (selectedImage != null) {
+                        try {
+                          final bytes = await selectedImage!.readAsBytes();
+                          
+                          // Enforce pure Dart compression to fix PNG issues
+                          img.Image? decodedImage = img.decodeImage(bytes);
+                          if (decodedImage != null) {
+                            if (decodedImage.width > 400 || decodedImage.height > 400) {
+                              decodedImage = img.copyResize(decodedImage, width: 400);
+                            }
+                            
+                            final compressedBytes = img.encodeJpg(decodedImage, quality: 60);
+                            final base64String = base64Encode(compressedBytes);
+                            imageUrl = 'data:image/jpeg;base64,$base64String';
+                          }
+                        } catch (e) {
+                          debugPrint('Error encoding image: $e');
+                        }
+                      }
+
+                      final newCat = ProductCategory(
+                        id: id,
+                        name: nameController.text.trim(),
+                        image: imageUrl,
+                      );
+                      db.addCategory(newCat);
+                      if (context.mounted) Navigator.pop(context);
+                    }
+                  },
+                  child: const Text('Save'),
+                ),
+              ],
+            );
+          },
         );
       },
     );
@@ -273,36 +388,128 @@ class _CategoryListScreenState extends State<CategoryListScreen> {
 
   void _showEditCategoryDialog(BuildContext context, ProductCategory category) {
     final TextEditingController nameController = TextEditingController(text: category.name);
+    File? selectedImage;
+    bool isUploading = false;
+
     showDialog(
       context: context,
+      barrierDismissible: false,
       builder: (context) {
-        return AlertDialog(
-          title: const Text('Edit Category'),
-          content: TextField(
-            controller: nameController,
-            decoration: const InputDecoration(hintText: 'Category Name'),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                if (nameController.text.trim().isNotEmpty) {
-                  final db = Provider.of<DatabaseService>(context, listen: false);
-                  final updatedCat = ProductCategory(
-                    id: category.id,
-                    name: nameController.text.trim(),
-                    image: category.image,
-                  );
-                  db.updateCategory(updatedCat);
-                  Navigator.pop(context);
-                }
-              },
-              child: const Text('Save'),
-            ),
-          ],
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: const Text('Edit Category'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    GestureDetector(
+                      onTap: () async {
+                        final picker = ImagePicker();
+                        final pickedFile = await picker.pickImage(
+                          source: ImageSource.gallery,
+                          maxWidth: 400,
+                          maxHeight: 400,
+                          imageQuality: 60,
+                        );
+                        if (pickedFile != null) {
+                          setState(() {
+                            selectedImage = File(pickedFile.path);
+                          });
+                        }
+                      },
+                      child: Container(
+                        height: 100,
+                        width: 100,
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade200,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.grey.shade400),
+                        ),
+                        child: selectedImage != null
+                            ? ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: Image.file(selectedImage!, fit: BoxFit.cover),
+                              )
+                            : category.image.isNotEmpty
+                                ? ClipRRect(
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: category.image.startsWith('data:image')
+                                        ? Image.memory(
+                                            base64Decode(category.image.split(',')[1]),
+                                            fit: BoxFit.cover,
+                                            errorBuilder: (context, error, stackTrace) => const Center(
+                                              child: Icon(Icons.broken_image, size: 40, color: Colors.grey),
+                                            ),
+                                          )
+                                        : CachedNetworkImage(
+                                            imageUrl: category.image,
+                                            fit: BoxFit.cover,
+                                            placeholder: (context, url) => const Center(
+                                              child: CircularProgressIndicator(),
+                                            ),
+                                            errorWidget: (context, url, error) => const Center(
+                                              child: Icon(Icons.broken_image, size: 40, color: Colors.grey),
+                                            ),
+                                          ),
+                                  )
+                                : const Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(Icons.add_a_photo, color: Colors.grey),
+                                      SizedBox(height: 4),
+                                      Text('Add Photo', style: TextStyle(fontSize: 10, color: Colors.grey)),
+                                    ],
+                                  ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: nameController,
+                      decoration: const InputDecoration(hintText: 'Category Name'),
+                    ),
+                    if (isUploading) ...[
+                      const SizedBox(height: 16),
+                      const CircularProgressIndicator(),
+                    ],
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: isUploading ? null : () => Navigator.pop(context),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: isUploading ? null : () async {
+                    if (nameController.text.trim().isNotEmpty) {
+                      setState(() {
+                        isUploading = true;
+                      });
+                      final db = Provider.of<DatabaseService>(context, listen: false);
+                      String imageUrl = category.image;
+
+                      if (selectedImage != null) {
+                        final url = await db.uploadCategoryImage(selectedImage!, category.id);
+                        if (url != null) {
+                          imageUrl = url;
+                        }
+                      }
+
+                      final updatedCat = ProductCategory(
+                        id: category.id,
+                        name: nameController.text.trim(),
+                        image: imageUrl,
+                      );
+                      db.updateCategory(updatedCat);
+                      if (context.mounted) Navigator.pop(context);
+                    }
+                  },
+                  child: const Text('Save'),
+                ),
+              ],
+            );
+          },
         );
       },
     );

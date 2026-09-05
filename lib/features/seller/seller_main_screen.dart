@@ -56,7 +56,22 @@ class _SellerMainScreenState extends State<SellerMainScreen> {
           ),
         ],
       ),
-      body: _screens[_currentIndex],
+      body: Column(
+        children: [
+          if (db.isOfflineMode)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+              color: Colors.orange.shade800,
+              child: const Text(
+                '⚠️ Offline Mode — Data may be outdated. Connect to server.',
+                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          Expanded(child: _screens[_currentIndex]),
+        ],
+      ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _currentIndex,
         onDestinationSelected: (index) {

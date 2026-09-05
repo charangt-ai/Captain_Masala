@@ -31,8 +31,8 @@ class AppUser {
 
   factory AppUser.fromMap(Map<String, dynamic> map) {
     return AppUser(
-      id: map['id'],
-      email: map['email'],
+      id: map['id'] ?? '',
+      email: map['email'] ?? '',
       role: map['role'] ?? 'pending',
       requestedRole: map['requestedRole'],
       name: map['name'] ?? '',

@@ -8,6 +8,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import '../../core/services/database_service.dart';
 import '../../core/theme.dart';
+import '../../core/permissions.dart';
 import '../../core/models/master_product.dart';
 
 class VariantDeduction {
@@ -84,7 +85,7 @@ class _InventoryDeductionReportScreenState extends State<InventoryDeductionRepor
     }).toList();
 
     // If seller, only show their sales
-    if (db.currentUserProfile?.role == 'seller') {
+    if (Permissions.isSeller(db.currentUserProfile?.role)) {
       filteredSales = filteredSales.where((s) => s.sellerId == db.currentUserProfile!.id).toList();
     }
 

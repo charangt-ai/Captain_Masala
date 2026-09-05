@@ -1,26 +1,28 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'core/services/database_service.dart';
 import 'core/services/cart_service.dart';
 import 'core/theme.dart';
 import 'features/auth/splash_screen.dart';
-import 'package:firebase_core/firebase_core.dart';
-import 'firebase_options.dart';
-
 void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
-  runApp(
-    MultiProvider(
-      providers: [
-        ChangeNotifierProvider(create: (_) => DatabaseService()),
-        ChangeNotifierProvider(create: (_) => CartService()),
-      ],
-      child: const CaptainMasalaApp(),
-    ),
-  );
+  runZonedGuarded(() async {
+    WidgetsFlutterBinding.ensureInitialized();
+
+    runApp(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider(create: (_) => DatabaseService()),
+          ChangeNotifierProvider(create: (_) => CartService()),
+        ],
+        child: const CaptainMasalaApp(),
+      ),
+    );
+  }, (error, stack) {
+    debugPrint('Uncaught asynchronous error: $error');
+    debugPrint('Stack trace: $stack');
+    // Here you would typically log to Firebase Crashlytics if available
+  });
 }
 
 class CaptainMasalaApp extends StatelessWidget {

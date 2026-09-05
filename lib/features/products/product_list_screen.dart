@@ -6,6 +6,7 @@ import '../../core/models/master_product.dart';
 import '../../core/models/product_category.dart';
 import '../../core/services/database_service.dart';
 import '../../core/theme.dart';
+import '../../core/permissions.dart';
 import 'product_detail_screen.dart';
 
 class ProductListScreen extends StatelessWidget {
@@ -171,7 +172,7 @@ class ProductListScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final db = Provider.of<DatabaseService>(context);
     final rupeeFormat = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0);
-    final isSuperAdmin = db.currentUserProfile?.role == 'super_admin';
+    final isSuperAdmin = Permissions.isSuperAdmin(db.currentUserProfile?.role);
 
     // Filter out any ghost master products that have no variants
     final validMasterProducts = db.masterProducts.where((m) {

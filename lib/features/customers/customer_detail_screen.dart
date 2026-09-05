@@ -4,6 +4,8 @@ import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'dart:io';
 import '../../core/models/customer.dart';
+import '../../core/models/sale.dart';
+import '../../core/permissions.dart';
 import '../../core/services/database_service.dart';
 import '../../core/theme.dart';
 import 'customer_form_dialog.dart';
@@ -246,6 +248,16 @@ class CustomerDetailScreen extends StatelessWidget {
                             Text('Owner: ${currentCustomer.ownerName}', style: const TextStyle(fontSize: 14)),
                           ],
                         ),
+                        if (currentCustomer.handledByName != null && currentCustomer.handledByName!.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              const Icon(Icons.assignment_ind, size: 16, color: AppColors.primaryRed),
+                              const SizedBox(width: 8),
+                              Text('Handled by: ${currentCustomer.handledByName}', style: const TextStyle(fontSize: 14, color: AppColors.primaryRed, fontWeight: FontWeight.bold)),
+                            ],
+                          ),
+                        ],
                         const SizedBox(height: 4),
                         Row(
                           children: [
@@ -389,7 +401,7 @@ class CustomerDetailScreen extends StatelessWidget {
                                   color: sale.paymentStatus == 'Paid' ? AppColors.primaryGreen : AppColors.lowStockAlert,
                                 ),
                               ),
-                              if (db.currentUserProfile?.role == 'delivery')
+                              if (Permissions.isDeliveryOnly(db.currentUserProfile?.role))
                                 Text(
                                   sale.deliveryStatus,
                                   style: TextStyle(
@@ -459,7 +471,7 @@ class CustomerDetailScreen extends StatelessWidget {
                                                       sale,
                                                       customerPhone: currentCustomer.mobileNumber,
                                                       customerAddress: '${currentCustomer.address}, ${currentCustomer.city} - ${currentCustomer.district}',
-                                                      showDeliveryStatus: db.currentUserProfile?.role == 'delivery',
+                                                      showDeliveryStatus: Permissions.isDeliveryOnly(db.currentUserProfile?.role),
                                                     );
                                                     if (dialogCtx.mounted) {
                                                       final xFile = XFile(file.path, mimeType: 'application/pdf');

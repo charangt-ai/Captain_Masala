@@ -32,10 +32,20 @@ class _LoginScreenState extends State<LoginScreen> {
     if (!mounted) return;
 
     if (role == 'super_admin' || role == 'admin') {
+      if (db.isOfflineMode) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Logged in offline — some features may be unavailable until you reconnect')),
+        );
+      }
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (_) => const DashboardScreen()),
       );
     } else if (role == 'seller' || role == 'delivery') {
+      if (db.isOfflineMode) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Logged in offline — some features may be unavailable until you reconnect')),
+        );
+      }
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (_) => const SellerMainScreen()),
       );
@@ -57,17 +67,44 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
       );
     } else if (role == 'network_error') {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Network error. Please check your internet connection.'),
-          backgroundColor: AppColors.primaryRed,
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => AlertDialog(
+          icon: const Icon(Icons.signal_wifi_off_rounded, color: Colors.orange, size: 48),
+          title: const Text('Connection Error', textAlign: TextAlign.center),
+          content: const Text(
+            'Unable to connect to the server. Please check your internet connection and tap Retry.',
+            textAlign: TextAlign.center,
+            style: TextStyle(height: 1.5),
+          ),
+          actionsAlignment: MainAxisAlignment.center,
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton.icon(
+              icon: const Icon(Icons.refresh),
+              label: const Text('Retry'),
+              onPressed: () {
+                Navigator.of(ctx).pop();
+                _handleLogin();
+              },
+            ),
+          ],
         ),
       );
     } else {
+      // 'invalid' — wrong credentials
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Invalid username or password!'),
+        SnackBar(
+          content: Text(
+            'Invalid username/email or password. Please check your credentials.\n'
+            '(Debug: login returned "$role" for "${_usernameController.text}")',
+          ),
           backgroundColor: AppColors.outOfStockAlert,
+          duration: const Duration(seconds: 6),
         ),
       );
     }

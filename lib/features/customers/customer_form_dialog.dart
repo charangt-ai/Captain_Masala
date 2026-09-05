@@ -330,6 +330,7 @@ void showCustomerFormDialog(BuildContext context, {Customer? customerToEdit}) {
                   if (!context.mounted) return;
 
                   final db = Provider.of<DatabaseService>(context, listen: false);
+                  final currentUser = db.currentUserProfile;
                   final customer = Customer(
                     id: isEditing ? customerToEdit.id : DateTime.now().millisecondsSinceEpoch.toString(),
                     name: ownerNameController.text.trim(),
@@ -343,6 +344,8 @@ void showCustomerFormDialog(BuildContext context, {Customer? customerToEdit}) {
                     shopImageUrl: finalImagePath,
                     latitude: lat,
                     longitude: lng,
+                    handledById: isEditing ? customerToEdit.handledById : currentUser?.id,
+                    handledByName: isEditing ? customerToEdit.handledByName : currentUser?.name,
                   );
                   
                   if (isEditing) {

@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../../core/services/database_service.dart';
 import '../../core/theme.dart';
+import '../../core/permissions.dart';
 import '../products/product_list_screen.dart';
 import '../customers/customer_list_screen.dart';
 import '../sales/sales_entry_screen.dart';
@@ -38,7 +39,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final db = Provider.of<DatabaseService>(context);
 
     // Protection for Dashboard access
-    if (db.currentUserProfile != null && db.currentUserProfile!.role == 'seller') {
+    if (db.currentUserProfile != null && Permissions.isSeller(db.currentUserProfile?.role)) {
       return const SellerMainScreen();
     }
 
@@ -66,7 +67,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
         ],
       ),
-      body: screens[_currentIndex],
+      body: Column(
+        children: [
+          if (db.isOfflineMode)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+              color: Colors.orange.shade800,
+              child: const Text(
+                '⚠️ Offline Mode — Data may be outdated. Connect to server.',
+                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          Expanded(child: screens[_currentIndex]),
+        ],
+      ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _currentIndex,
         onDestinationSelected: (index) {
@@ -340,7 +356,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             scrollDirection: Axis.horizontal,
             child: Row(
               children: [
-                if (db.currentUserProfile?.role == 'super_admin')
+                if (Permissions.isSuperAdmin(db.currentUserProfile?.role))
                   _buildActionButton(context, Icons.security, 'Manage Sellers', () {
                     Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ManageUsersScreen()));
                   }),

@@ -23,6 +23,32 @@ class Product {
     this.masterProductId = '',
   });
 
+  Product copyWith({
+    String? id,
+    String? name,
+    String? packSize,
+    double? wholesalePrice,
+    double? originalPrice,
+    double? remainingStock,
+    String? imageUrl,
+    bool? isEnabled,
+    String? categoryId,
+    String? masterProductId,
+  }) {
+    return Product(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      packSize: packSize ?? this.packSize,
+      wholesalePrice: wholesalePrice ?? this.wholesalePrice,
+      originalPrice: originalPrice ?? this.originalPrice,
+      remainingStock: remainingStock ?? this.remainingStock,
+      imageUrl: imageUrl ?? this.imageUrl,
+      isEnabled: isEnabled ?? this.isEnabled,
+      categoryId: categoryId ?? this.categoryId,
+      masterProductId: masterProductId ?? this.masterProductId,
+    );
+  }
+
   Map<String, dynamic> toMap() {
     return {
       'id': id,

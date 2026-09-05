@@ -84,6 +84,8 @@ class InvoiceGenerator {
                       pw.Text('Bill No: ${sale.invoiceNumber}', style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey700)),
                       pw.SizedBox(height: 2),
                       pw.Text('Date: ${dateFormat.format(sale.dateTime)}', style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey700)),
+                      pw.SizedBox(height: 2),
+                      pw.Text('Handled by: ${sale.sellerName}${sale.sellerRole != null ? ' - ${sale.sellerRole}' : ''}', style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey700)),
                       pw.SizedBox(height: 6),
                       pw.Container(
                         padding: const pw.EdgeInsets.symmetric(horizontal: 12, vertical: 4),

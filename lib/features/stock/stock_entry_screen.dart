@@ -122,24 +122,37 @@ class _StockEntryScreenState extends State<StockEntryScreen> {
                       const SizedBox(height: 24),
 
                       ElevatedButton(
-                        onPressed: () {
+                        onPressed: () async {
                           if (!_formKey.currentState!.validate() || _selectedProduct == null) return;
 
                           final newStock = double.parse(_stockController.text);
-                          db.updateMasterStock(
+                          
+                          // Show loading indicator or disable button if needed in a real app, 
+                          // but for simplicity we'll just await the result here.
+                          final success = await db.updateMasterStock(
                             _selectedProduct!.id,
                             newStock,
                             _notesController.text.trim(),
                           );
 
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Stock level updated successfully!'),
-                              backgroundColor: AppColors.primaryGreen,
-                            ),
-                          );
+                          if (!mounted) return;
 
-                          Navigator.of(context).pop();
+                          if (success) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Stock level updated successfully!'),
+                                backgroundColor: AppColors.primaryGreen,
+                              ),
+                            );
+                            Navigator.of(context).pop();
+                          } else {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Failed to update stock. Please check your connection and try again.'),
+                                backgroundColor: AppColors.primaryRed,
+                              ),
+                            );
+                          }
                         },
                         child: const Text('Save Stock Level'),
                       ),

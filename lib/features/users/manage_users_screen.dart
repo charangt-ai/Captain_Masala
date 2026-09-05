@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../core/services/database_service.dart';
 import '../../core/models/app_user.dart';
 import '../../core/theme.dart';
+import '../../core/permissions.dart';
 import 'user_profile_view_screen.dart';
 
 class ManageUsersScreen extends StatefulWidget {
@@ -69,7 +70,7 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
   }
 
   Future<void> _showChangeRoleDialog(AppUser user) async {
-    String newRole = user.role == 'delivery' ? 'seller' : 'delivery';
+    String newRole = Permissions.isDeliveryOnly(user.role) ? 'seller' : 'delivery';
     
     await showDialog(
       context: context,
@@ -125,7 +126,7 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
             leading: CircleAvatar(
               backgroundColor: AppColors.primaryRed.withOpacity(0.1),
               child: Icon(
-                user.role == 'delivery' ? Icons.local_shipping : Icons.storefront,
+                Permissions.isDeliveryOnly(user.role) ? Icons.local_shipping : Icons.storefront,
                 color: AppColors.primaryRed,
               ),
             ),
@@ -142,7 +143,7 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
                 user.role.toUpperCase(),
                 style: const TextStyle(fontSize: 10, color: Colors.white),
               ),
-              backgroundColor: user.role == 'delivery' ? Colors.blue : AppColors.primaryRed,
+              backgroundColor: Permissions.isDeliveryOnly(user.role) ? Colors.blue : AppColors.primaryRed,
             ),
           ),
         );

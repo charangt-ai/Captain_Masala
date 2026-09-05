@@ -3,8 +3,13 @@ import 'package:provider/provider.dart';
 import '../../../core/services/database_service.dart';
 import '../../../core/services/cart_service.dart';
 import '../../../core/theme.dart';
+import '../../../core/permissions.dart';
 import '../../../core/models/product.dart';
 import '../../../core/models/product_category.dart';
+import 'dart:io';
+import 'dart:convert';
+import 'package:image_picker/image_picker.dart';
+import 'package:image/image.dart' as img;
 import 'widgets/shop_search_bar.dart';
 import 'widgets/product_card.dart';
 import 'cart_screen.dart';
@@ -23,7 +28,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
   Widget build(BuildContext context) {
     final db = Provider.of<DatabaseService>(context);
     final cartService = Provider.of<CartService>(context);
-    final isSuperAdmin = db.currentUserProfile?.role == 'super_admin';
+    final isSuperAdmin = Permissions.isSuperAdmin(db.currentUserProfile?.role);
     
     // Filter logic: Uses the centralized db.getProductsForCategory method
     List<Product> categoryProducts = db.getProductsForCategory(widget.category.id);
@@ -212,61 +217,173 @@ class _ProductListScreenState extends State<ProductListScreen> {
     final wholesalePriceController = TextEditingController(text: product?.wholesalePrice.toString() ?? '');
     final originalPriceController = TextEditingController(text: product?.originalPrice.toString() ?? '');
     final stockController = TextEditingController(text: product?.remainingStock.toString() ?? '100');
+    
+    File? selectedImage;
+    String currentImageUrl = product?.imageUrl ?? '';
 
     showDialog(
       context: context,
       builder: (context) {
-        return AlertDialog(
-          title: Text(isEditing ? 'Edit Product' : 'Add New Product'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(controller: nameController, decoration: const InputDecoration(labelText: 'Product Name')),
-                TextField(controller: packSizeController, decoration: const InputDecoration(labelText: 'Pack Size (e.g. 50g)')),
-                TextField(controller: wholesalePriceController, decoration: const InputDecoration(labelText: 'Selling Price (Rs)'), keyboardType: TextInputType.number),
-                TextField(controller: originalPriceController, decoration: const InputDecoration(labelText: 'Original Price (Rs)'), keyboardType: TextInputType.number),
-                TextField(controller: stockController, decoration: const InputDecoration(labelText: 'Stock Quantity'), keyboardType: TextInputType.number),
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: Text(isEditing ? 'Edit Product' : 'Add New Product'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    GestureDetector(
+                      onTap: () async {
+                        final picker = ImagePicker();
+                        final pickedFile = await picker.pickImage(
+                          source: ImageSource.gallery,
+                          maxWidth: 400,
+                          maxHeight: 400,
+                          imageQuality: 60,
+                        );
+                        if (pickedFile != null) {
+                          setState(() {
+                            selectedImage = File(pickedFile.path);
+                          });
+                        }
+                      },
+                      child: Container(
+                        height: 100,
+                        width: 100,
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade200,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.grey.shade400),
+                        ),
+                        child: selectedImage != null
+                            ? ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: Image.file(selectedImage!, fit: BoxFit.cover),
+                              )
+                            : currentImageUrl.isNotEmpty
+                                ? ClipRRect(
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: currentImageUrl.startsWith('data:image')
+                                        ? Image.memory(
+                                            base64Decode(currentImageUrl.split(',')[1]),
+                                            fit: BoxFit.cover,
+                                            errorBuilder: (context, error, stackTrace) => const Center(
+                                              child: Icon(Icons.broken_image, size: 40, color: Colors.grey),
+                                            ),
+                                          )
+                                        : const Center(child: Icon(Icons.broken_image)),
+                                  )
+                                : const Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(Icons.add_a_photo, color: Colors.grey),
+                                      SizedBox(height: 4),
+                                      Text('Add Photo', style: TextStyle(fontSize: 10, color: Colors.grey)),
+                                    ],
+                                  ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(controller: nameController, decoration: const InputDecoration(labelText: 'Product Name')),
+                    TextField(controller: packSizeController, decoration: const InputDecoration(labelText: 'Pack Size (e.g. 50g)')),
+                    TextField(controller: wholesalePriceController, decoration: const InputDecoration(labelText: 'Selling Price (Rs)'), keyboardType: TextInputType.number),
+                    TextField(controller: originalPriceController, decoration: const InputDecoration(labelText: 'Original Price (Rs)'), keyboardType: TextInputType.number),
+                    TextField(controller: stockController, decoration: const InputDecoration(labelText: 'Stock Quantity'), keyboardType: TextInputType.number),
+                  ],
+                ),
+              ),
+              actions: [
+                if (isEditing)
+                  TextButton(
+                    onPressed: () async {
+                      final confirm = await showDialog<bool>(
+                        context: context,
+                        builder: (c) => AlertDialog(
+                          title: const Text('Delete Product'),
+                          content: const Text('Are you sure you want to delete this variant?'),
+                          actions: [
+                            TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')),
+                            ElevatedButton(
+                              style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+                              onPressed: () => Navigator.pop(c, true),
+                              child: const Text('Delete'),
+                            ),
+                          ],
+                        ),
+                      );
+                      
+                      if (confirm == true && context.mounted) {
+                        Provider.of<DatabaseService>(context, listen: false).deleteProduct(product!.id);
+                        Navigator.pop(context); // Close the edit dialog
+                      }
+                    },
+                    child: const Text('Delete', style: TextStyle(color: Colors.red)),
+                  ),
+                TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+                ElevatedButton(
+                  onPressed: () async {
+                    if (nameController.text.trim().isEmpty || wholesalePriceController.text.trim().isEmpty) return;
+
+                    String newImageUrl = currentImageUrl;
+                    if (selectedImage != null) {
+                      try {
+                        final bytes = await selectedImage!.readAsBytes();
+                        
+                        // Enforce pure Dart compression to fix PNG issues
+                        img.Image? decodedImage = img.decodeImage(bytes);
+                        if (decodedImage != null) {
+                          // Resize if too large
+                          if (decodedImage.width > 400 || decodedImage.height > 400) {
+                            decodedImage = img.copyResize(decodedImage, width: 400);
+                          }
+                          
+                          // Encode to JPEG with compression
+                          final compressedBytes = img.encodeJpg(decodedImage, quality: 60);
+                          final base64String = base64Encode(compressedBytes);
+                          newImageUrl = 'data:image/jpeg;base64,$base64String';
+                        }
+                      } catch (e) {
+                        debugPrint('Error encoding image: $e');
+                      }
+                    }
+
+                    final db = Provider.of<DatabaseService>(context, listen: false);
+
+                    // Generate masterProductId from product name for proper catalog grouping
+                    String masterId = isEditing
+                        ? (product!.masterProductId)
+                        : nameController.text.trim().toLowerCase().replaceAll(' ', '_');
+
+                    final newProduct = Product(
+                      id: isEditing ? product!.id : DateTime.now().millisecondsSinceEpoch.toString(),
+                      name: nameController.text.trim(),
+                      packSize: packSizeController.text.trim(),
+                      wholesalePrice: double.tryParse(wholesalePriceController.text.trim()) ?? 0.0,
+                      originalPrice: double.tryParse(originalPriceController.text.trim()) ?? 0.0,
+                      remainingStock: double.tryParse(stockController.text.trim()) ?? 0.0,
+                      categoryId: widget.category.id, // Enforce category attachment
+                      isEnabled: product?.isEnabled ?? true,
+                      imageUrl: newImageUrl,
+                      masterProductId: masterId,
+                    );
+
+                    if (isEditing) {
+                      db.updateProduct(newProduct);
+                      // Auto-sync the image to all other variants (e.g. 500g, 1kg)
+                      if (selectedImage != null) {
+                        db.updateImageForSimilarProducts(newProduct.name, newImageUrl);
+                      }
+                    } else {
+                      db.addProduct(newProduct);
+                    }
+
+                    if (context.mounted) Navigator.pop(context);
+                  },
+                  child: const Text('Save'),
+                ),
               ],
-            ),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-            ElevatedButton(
-              onPressed: () {
-                if (nameController.text.trim().isEmpty || wholesalePriceController.text.trim().isEmpty) return;
-
-                final db = Provider.of<DatabaseService>(context, listen: false);
-
-                // Generate masterProductId from product name for proper catalog grouping
-                String masterId = isEditing
-                    ? (product.masterProductId)
-                    : nameController.text.trim().toLowerCase().replaceAll(' ', '_');
-
-                final newProduct = Product(
-                  id: isEditing ? product.id : DateTime.now().millisecondsSinceEpoch.toString(),
-                  name: nameController.text.trim(),
-                  packSize: packSizeController.text.trim(),
-                  wholesalePrice: double.tryParse(wholesalePriceController.text.trim()) ?? 0.0,
-                  originalPrice: double.tryParse(originalPriceController.text.trim()) ?? 0.0,
-                  remainingStock: double.tryParse(stockController.text.trim()) ?? 0.0,
-                  categoryId: widget.category.id, // Enforce category attachment
-                  isEnabled: product?.isEnabled ?? true,
-                  imageUrl: product?.imageUrl ?? '',
-                  masterProductId: masterId,
-                );
-
-                if (isEditing) {
-                  db.updateProduct(newProduct);
-                } else {
-                  db.addProduct(newProduct);
-                }
-
-                Navigator.pop(context);
-              },
-              child: const Text('Save'),
-            ),
-          ],
+            );
+          },
         );
       },
     );

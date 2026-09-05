@@ -8,7 +8,9 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import '../../core/services/database_service.dart';
 import '../../core/theme.dart';
+import '../../core/permissions.dart';
 import '../../core/models/sale.dart';
+import '../../core/models/app_user.dart';
 import 'inventory_deduction_report.dart';
 import 'sales_report_pdf_generator.dart';
 
@@ -27,11 +29,29 @@ class _ReportsScreenState extends State<ReportsScreen> {
   DateTime? _startDate;
   DateTime? _endDate;
   final List<String> _filters = ['Daily', 'Weekly', 'Monthly', 'Custom'];
+  
+  AppUser? _selectedUserFilter;
+  List<AppUser> _activeUsers = [];
 
   @override
   void initState() {
     super.initState();
     _calculateDatesForFilter(_selectedFilter);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadActiveUsers();
+    });
+  }
+
+  Future<void> _loadActiveUsers() async {
+    final db = Provider.of<DatabaseService>(context, listen: false);
+    if (Permissions.canViewReports(db.currentUserProfile?.role)) {
+      final users = await db.getActiveUsers();
+      if (mounted) {
+        setState(() {
+          _activeUsers = users;
+        });
+      }
+    }
   }
 
   void _calculateDatesForFilter(String filter) {
@@ -119,8 +139,10 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
       var filteredSales = db.sales.where((s) => s.dateTime.isAfter(filterStartDate) && s.dateTime.isBefore(filterEndDate)).toList();
 
-      if (db.currentUserProfile?.role == 'seller') {
+      if (Permissions.isSeller(db.currentUserProfile?.role)) {
         filteredSales = filteredSales.where((s) => s.sellerId == db.currentUserProfile!.id).toList();
+      } else if (_selectedUserFilter != null) {
+        filteredSales = filteredSales.where((s) => s.sellerId == _selectedUserFilter!.id).toList();
       }
 
       if (filteredSales.isEmpty) {
@@ -160,7 +182,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
           final dateStr = DateFormat('yyyy-MM-dd').format(sale.dateTime);
           for (var item in sale.items) {
             final formattedQty = '${item.packSize} x ${item.quantity.toInt()}';
-            buffer.writeln('$dateStr,"${sale.invoiceNumber}","${sale.sellerName}","$shopName","${item.productName}","$formattedQty",${sale.paymentStatus},${item.totalAmount}');
+            final sellerDisplay = sale.sellerRole != null ? '${sale.sellerName} (${sale.sellerRole})' : sale.sellerName;
+            buffer.writeln('$dateStr,"${sale.invoiceNumber}","$sellerDisplay","$shopName","${item.productName}","$formattedQty",${sale.paymentStatus},${item.totalAmount}');
           }
         }
         final directory = await getTemporaryDirectory();
@@ -251,7 +274,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                 "Select a time period below to generate a detailed report of all sales transactions. You can download it as a branded PDF or a raw CSV for Excel.",
                 style: TextStyle(color: AppColors.textLight, fontSize: 14),
               ),
-              if (db.currentUserProfile?.role != 'seller') ...[
+              if (db.currentUserProfile?.role != 'seller' && db.currentUserProfile?.role != 'delivery') ...[
                 const SizedBox(height: 32),
                 const Text('Interactive Reports', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: AppColors.textDark)),
                 const SizedBox(height: 16),
@@ -268,6 +291,43 @@ class _ReportsScreenState extends State<ReportsScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      if (Permissions.canViewReports(db.currentUserProfile?.role)) ...[
+                        const Text('Filter by Personnel', style: TextStyle(fontWeight: FontWeight.w500, color: AppColors.textDark)),
+                        const SizedBox(height: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Colors.grey.shade300),
+                            borderRadius: BorderRadius.circular(8),
+                            color: Colors.grey.shade50,
+                          ),
+                          child: DropdownButtonHideUnderline(
+                            child: DropdownButton<AppUser?>(
+                              isExpanded: true,
+                              value: _selectedUserFilter,
+                              hint: const Text('All Personnel'),
+                              items: [
+                                const DropdownMenuItem<AppUser?>(
+                                  value: null,
+                                  child: Text('All Personnel'),
+                                ),
+                                ..._activeUsers.map((user) {
+                                  return DropdownMenuItem<AppUser?>(
+                                    value: user,
+                                    child: Text('${user.name} (${user.role})'),
+                                  );
+                                }),
+                              ],
+                              onChanged: (user) {
+                                setState(() {
+                                  _selectedUserFilter = user;
+                                });
+                              },
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                      ],
                       Wrap(
                         spacing: 8.0,
                         runSpacing: 8.0,

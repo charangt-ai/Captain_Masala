@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../core/services/database_service.dart';
 import '../../core/theme.dart';
+import '../../core/permissions.dart';
 import 'invoice_generator.dart';
 import 'order_detail_screen.dart';
 
@@ -49,8 +50,8 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
     final db = Provider.of<DatabaseService>(context);
     final rupeeFormat = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0);
 
-    final isSuperAdmin = db.currentUserProfile?.role == 'super_admin';
-    final isDeliveryRole = db.currentUserProfile?.role == 'delivery';
+    final isSuperAdmin = Permissions.isSuperAdmin(db.currentUserProfile?.role);
+    final isDeliveryRole = Permissions.isDeliveryOnly(db.currentUserProfile?.role);
     final currentUserId = db.currentUserProfile?.id;
 
     final filteredSales = db.sales.where((sale) {
@@ -167,7 +168,13 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                           ),
                         ),
                         title: Text(displayShopName(sale), style: const TextStyle(fontWeight: FontWeight.bold)),
-                        subtitle: Text('${sale.invoiceNumber} • ${DateFormat('dd MMM yy, hh:mm a').format(sale.dateTime)}'),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('${sale.invoiceNumber} • ${DateFormat('dd MMM yy, hh:mm a').format(sale.dateTime)}'),
+                            Text('Handled by: ${sale.sellerName}${sale.sellerRole != null ? ' - ${sale.sellerRole}' : ''}', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                          ],
+                        ),
                         trailing: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           crossAxisAlignment: CrossAxisAlignment.end,

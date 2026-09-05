@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:convert';
 import '../../../core/theme.dart';
 import '../../../core/models/product.dart';
 import 'discount_badge.dart';
@@ -55,11 +56,26 @@ class ShopProductCard extends StatelessWidget {
                       ),
                     ),
                     alignment: Alignment.center,
-                    child: Icon(
-                      Icons.inventory_2_outlined,
-                      size: 40,
-                      color: Colors.brown.shade200,
-                    ), // Placeholder for actual image
+                    child: product.imageUrl.startsWith('data:image')
+                        ? ClipRRect(
+                            borderRadius: BorderRadius.circular(10),
+                            child: Image.memory(
+                              base64Decode(product.imageUrl.split(',')[1]),
+                              fit: BoxFit.cover,
+                              width: double.infinity,
+                              height: double.infinity,
+                              errorBuilder: (context, error, stackTrace) => Icon(
+                                Icons.broken_image,
+                                size: 40,
+                                color: Colors.brown.shade200,
+                              ),
+                            ),
+                          )
+                        : Icon(
+                            Icons.inventory_2_outlined,
+                            size: 40,
+                            color: Colors.brown.shade200,
+                          ), // Placeholder for actual image
                   ),
                   Positioned(
                     top: 8,

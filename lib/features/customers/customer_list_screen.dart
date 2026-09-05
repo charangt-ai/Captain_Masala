@@ -137,7 +137,23 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
                           child: c.shopImageUrl.isEmpty ? const Icon(Icons.storefront, color: AppColors.primaryGreen) : null,
                         ),
                         title: Text(c.shopName, style: const TextStyle(fontWeight: FontWeight.bold)),
-                        subtitle: Text('${c.ownerName} • ${c.city}, ${c.district}'),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('${c.ownerName} • ${c.city}, ${c.district}'),
+                            if (c.handledByName != null && c.handledByName!.isNotEmpty) ...[
+                              const SizedBox(height: 4),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: AppColors.primaryRed.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text('Handled by: ${c.handledByName}', style: const TextStyle(fontSize: 11, color: AppColors.primaryRed, fontWeight: FontWeight.bold)),
+                              ),
+                            ]
+                          ],
+                        ),
                         trailing: const Icon(Icons.chevron_right, color: AppColors.primaryRed),
                         onTap: () {
                           Navigator.of(context).push(

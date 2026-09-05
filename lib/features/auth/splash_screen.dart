@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+// removed firebase_auth
 import '../../core/services/database_service.dart';
 import '../../core/widgets/brand_logo.dart';
 import '../dashboard/dashboard_screen.dart';
@@ -36,22 +38,40 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
 
   Future<void> _navigateToNext() async {
     final db = Provider.of<DatabaseService>(context, listen: false);
+
+    // Step 1: Initialize DatabaseService (reads JWT token from storage)
+    bool isAuth = false;
     try {
-      await db.init().timeout(const Duration(seconds: 8));
+      isAuth = await db.init().timeout(const Duration(seconds: 5));
     } catch (_) {
-      // Init timed out (likely offline) — proceed with whatever state we have
+      // Init timed out — proceed anyway
     }
-    await Future.delayed(const Duration(milliseconds: 2000));
+
+    String? resolvedRole;
+
+    if (isAuth && db.currentUserProfile != null) {
+      resolvedRole = db.currentUserProfile!.role;
+    }
+
+    // Minimum splash duration for smooth UX
+    await Future.delayed(const Duration(milliseconds: 1200));
 
     if (!mounted) return;
 
-    if (db.isLoggedIn) {
-      final role = db.currentUserProfile?.role;
-      if (role == 'seller' || role == 'salesperson' || role == 'delivery') {
+    if (resolvedRole != null && db.isLoggedIn && resolvedRole != 'network_error') {
+      if (resolvedRole == 'seller' ||
+          resolvedRole == 'salesperson' ||
+          resolvedRole == 'delivery') {
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (_) => const SellerMainScreen()),
         );
+      } else if (resolvedRole == 'pending') {
+        // Pending users are not yet approved — go to login
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => const LoginScreen()),
+        );
       } else {
+        // super_admin, admin
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (_) => const DashboardScreen()),
         );

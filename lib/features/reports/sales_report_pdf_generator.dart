@@ -179,7 +179,7 @@ class SalesReportPdfGenerator {
                 return [
                   dateStr,
                   sale.invoiceNumber,
-                  sale.sellerName,
+                  sale.sellerRole != null ? '${sale.sellerName}\n(${sale.sellerRole})' : sale.sellerName,
                   shopName,
                   productNames,
                   quantities,
