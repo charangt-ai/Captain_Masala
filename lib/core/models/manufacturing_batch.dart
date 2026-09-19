@@ -60,7 +60,7 @@ class ManufacturingBatch {
       'createdById': createdById,
       'createdByName': createdByName,
       'timestamp': DateTime.now().toIso8601String(),
-      'status': 'COMPLETED',
+      'status': 'PENDING APPROVAL',
     };
   }
 

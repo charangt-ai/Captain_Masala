@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 
 const ManufacturingBatchSchema = new mongoose.Schema({
   targetProductId: {
-    type: mongoose.Schema.Types.ObjectId,
+    type: String,
     ref: 'MasterProduct',
     required: true,
   },
@@ -11,7 +11,7 @@ const ManufacturingBatchSchema = new mongoose.Schema({
     required: true,
   },
   createdById: {
-    type: mongoose.Schema.Types.ObjectId,
+    type: String,
     ref: 'User',
   },
   createdByName: {
