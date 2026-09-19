@@ -9,6 +9,7 @@ import '../models/sale.dart';
 import '../models/inventory_log.dart';
 import '../models/product_category.dart';
 import '../models/master_product.dart';
+import '../models/manufacturing_batch.dart';
 import 'api_config.dart';
 import 'offline_auth_service.dart';
 
@@ -310,7 +311,7 @@ class DatabaseService extends ChangeNotifier {
         Uri.parse('${ApiConfig.baseUrl}/auth/login'),
         headers: {'Content-Type': 'application/json'},
         body: json.encode({'usernameOrEmail': trimmedUser, 'password': trimmedPass}),
-      );
+      ).timeout(const Duration(seconds: 60));
       if (res.statusCode == 200) {
         final data = json.decode(res.body);
         await _storage.write(key: 'jwt_token', value: data['token']);
@@ -363,11 +364,11 @@ class DatabaseService extends ChangeNotifier {
           'password': password,
           'role': role,
         }),
-      );
+      ).timeout(const Duration(seconds: 60));
       if (res.statusCode == 201) {
         final data = json.decode(res.body);
         await _storage.write(key: 'jwt_token', value: data['token']);
-        return 'success';
+        return data['role'] ?? 'pending';
       } else {
         final err = json.decode(res.body);
         return err['message'] ?? 'Registration failed';
@@ -424,6 +425,10 @@ class DatabaseService extends ChangeNotifier {
 
   Future<void> rejectUser(String userId) async {
     await http.put(Uri.parse('${ApiConfig.baseUrl}/users/$userId/reject'), headers: await _getHeaders());
+  }
+
+  Future<void> deleteUser(String userId) async {
+    await http.delete(Uri.parse('${ApiConfig.baseUrl}/users/$userId'), headers: await _getHeaders());
   }
 
   Future<bool> requestRoleChange(String newRole) async {
@@ -723,5 +728,93 @@ class DatabaseService extends ChangeNotifier {
       if (match != null) return (double.tryParse(match.group(1) ?? '') ?? 0.0) / 1000.0;
     }
     return 1.0;
+  }
+
+  Future<bool> submitManufacturingBatch(ManufacturingBatch batch) async {
+    try {
+      final res = await http.post(
+        Uri.parse('${ApiConfig.baseUrl}/manufacturing/batch'),
+        headers: await _getHeaders(),
+        body: json.encode(batch.toMap()),
+      );
+      
+      if (res.statusCode == 201 || res.statusCode == 200) {
+        await _fetchMasterProducts();
+        await _fetchLogs(reset: true);
+        notifyListeners();
+        return true;
+      }
+      return false;
+    } catch (e) {
+      debugPrint('Error submitting manufacturing batch: $e');
+      return false;
+    }
+  }
+
+  Future<List<ManufacturingBatch>> fetchMonthlyBatches({int? month, int? year}) async {
+    try {
+      final queryParams = [];
+      if (month != null) queryParams.add('month=$month');
+      if (year != null) queryParams.add('year=$year');
+      
+      final queryString = queryParams.isNotEmpty ? '?${queryParams.join('&')}' : '';
+      
+      final res = await http.get(
+        Uri.parse('${ApiConfig.baseUrl}/manufacturing/batches$queryString'),
+        headers: await _getHeaders(),
+      );
+
+      if (res.statusCode == 200) {
+        final data = json.decode(res.body);
+        if (data['success'] == true) {
+          final List batches = data['data'];
+          return batches.map((e) => ManufacturingBatch.fromMap(e)).toList();
+        }
+      }
+      return [];
+    } catch (e) {
+      debugPrint('Error fetching manufacturing batches: $e');
+      return [];
+    }
+  }
+
+  Future<bool> deleteManufacturingBatch(String batchId) async {
+    try {
+      final res = await http.delete(
+        Uri.parse('${ApiConfig.baseUrl}/manufacturing/batch/$batchId'),
+        headers: await _getHeaders(),
+      );
+
+      if (res.statusCode == 200) {
+        await _fetchMasterProducts();
+        await _fetchLogs(reset: true);
+        notifyListeners();
+        return true;
+      }
+      return false;
+    } catch (e) {
+      debugPrint('Error deleting manufacturing batch: $e');
+      return false;
+    }
+  }
+
+  Future<bool> approveManufacturingBatch(String batchId) async {
+    try {
+      final res = await http.post(
+        Uri.parse('${ApiConfig.baseUrl}/manufacturing/batch/$batchId/approve'),
+        headers: await _getHeaders(),
+      );
+
+      if (res.statusCode == 200) {
+        await _fetchMasterProducts();
+        await _fetchLogs(reset: true);
+        notifyListeners();
+        return true;
+      }
+      return false;
+    } catch (e) {
+      debugPrint('Error approving manufacturing batch: $e');
+      return false;
+    }
   }
 }
