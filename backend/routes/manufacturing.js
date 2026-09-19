@@ -6,13 +6,10 @@ const MasterProduct = require('../models/MasterProduct');
 const Product = require('../models/Product');
 const InventoryLog = require('../models/InventoryLog');
 
-// @desc    Submit a new manufacturing batch and update inventory
+// @desc    Submit a new manufacturing batch (saved as PENDING APPROVAL)
 // @route   POST /api/manufacturing/batch
 // @access  Private
 router.post('/batch', protect, async (req, res) => {
-  const session = await MasterProduct.startSession();
-  session.startTransaction();
-
   try {
     const {
       targetProductId,
@@ -21,6 +18,7 @@ router.post('/batch', protect, async (req, res) => {
       createdByName,
       rawMaterialName,
       rawMaterialQuantity,
+      rawMaterialAmount,
       gstPercentage,
       weightBeforeDrying,
       weightAfterDrying,
@@ -35,13 +33,13 @@ router.post('/batch', protect, async (req, res) => {
       status
     } = req.body;
 
-    // 1. Validate Target Master Product
-    const masterProduct = await MasterProduct.findById(targetProductId).session(session);
+    // Validate Target Master Product exists
+    const masterProduct = await MasterProduct.findById(targetProductId);
     if (!masterProduct) {
-      throw new Error('Target Master Product not found');
+      return res.status(404).json({ success: false, message: 'Target Master Product not found' });
     }
 
-    // 2. Create the Manufacturing Batch Record
+    // Create the Manufacturing Batch Record
     const newBatch = new ManufacturingBatch({
       targetProductId,
       targetProductName,
@@ -49,6 +47,7 @@ router.post('/batch', protect, async (req, res) => {
       createdByName,
       rawMaterialName,
       rawMaterialQuantity,
+      rawMaterialAmount,
       gstPercentage,
       weightBeforeDrying,
       weightAfterDrying,
@@ -59,21 +58,14 @@ router.post('/batch', protect, async (req, res) => {
       finalOutputWeight,
       totalLoss,
       yieldPercentage,
-      status,
+      status: status || 'PENDING APPROVAL',
       timestamp: timestamp ? new Date(timestamp) : Date.now()
     });
     
-    await newBatch.save({ session });
-
-    // 3. We no longer deduct raw material or add to master stock here.
-    // It is simply saved as PENDING APPROVAL.
-    await session.commitTransaction();
-    session.endSession();
+    await newBatch.save();
 
     res.status(201).json({ success: true, batch: newBatch });
   } catch (error) {
-    await session.abortTransaction();
-    session.endSession();
     console.error('Error submitting manufacturing batch:', error);
     res.status(500).json({ success: false, message: error.message || 'Server error' });
   }

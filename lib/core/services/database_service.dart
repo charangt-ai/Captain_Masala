@@ -732,11 +732,20 @@ class DatabaseService extends ChangeNotifier {
 
   Future<bool> submitManufacturingBatch(ManufacturingBatch batch) async {
     try {
+      final payload = json.encode(batch.toMap());
+      debugPrint('=== SUBMIT BATCH REQUEST ===');
+      debugPrint('URL: ${ApiConfig.baseUrl}/manufacturing/batch');
+      debugPrint('Body: $payload');
+      
       final res = await http.post(
         Uri.parse('${ApiConfig.baseUrl}/manufacturing/batch'),
         headers: await _getHeaders(),
-        body: json.encode(batch.toMap()),
+        body: payload,
       );
+      
+      debugPrint('=== SUBMIT BATCH RESPONSE ===');
+      debugPrint('Status: ${res.statusCode}');
+      debugPrint('Body: ${res.body}');
       
       if (res.statusCode == 201 || res.statusCode == 200) {
         await _fetchMasterProducts();

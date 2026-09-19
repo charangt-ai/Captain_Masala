@@ -29,6 +29,10 @@ const ManufacturingBatchSchema = new mongoose.Schema({
     type: Number,
     default: 0,
   },
+  rawMaterialAmount: {
+    type: Number,
+    default: 0,
+  },
   weightBeforeDrying: Number,
   weightAfterDrying: Number,
   dryingLoss: Number,
