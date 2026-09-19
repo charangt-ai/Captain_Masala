@@ -24,6 +24,7 @@ const categoryRoutes = require('./routes/categories');
 const customerRoutes = require('./routes/customers');
 const saleRoutes = require('./routes/sales');
 const inventoryRoutes = require('./routes/inventory');
+const manufacturingRoutes = require('./routes/manufacturing');
 
 // Mount routers
 app.use('/api/auth', authRoutes);
@@ -34,6 +35,7 @@ app.use('/api/categories', categoryRoutes);
 app.use('/api/customers', customerRoutes);
 app.use('/api/sales', saleRoutes);
 app.use('/api/inventory-logs', inventoryRoutes);
+app.use('/api/manufacturing', manufacturingRoutes);
 
 app.get('/', (req, res) => {
   res.send('Captain Masala API is running');
