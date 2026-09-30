@@ -19,11 +19,11 @@ const ManufacturingBatchSchema = new mongoose.Schema({
   },
   rawMaterialName: {
     type: String,
-    required: true,
+    required: false, // Make optional since we use rawMaterials array now
   },
   rawMaterialQuantity: {
     type: Number,
-    required: true,
+    required: false,
   },
   gstPercentage: {
     type: Number,
@@ -33,6 +33,12 @@ const ManufacturingBatchSchema = new mongoose.Schema({
     type: Number,
     default: 0,
   },
+  rawMaterials: [{
+    name: String,
+    quantity: Number,
+    amount: Number,
+    gstPercentage: Number
+  }],
   weightBeforeDrying: Number,
   weightAfterDrying: Number,
   dryingLoss: Number,
