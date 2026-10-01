@@ -146,7 +146,7 @@ class _ManufacturingScreenState extends State<ManufacturingScreen> {
                       value: _selectedProductId,
                       items: _masterProducts.map((product) {
                         return DropdownMenuItem<String>(
-                          value: product['_id'],
+                          value: product['id'],
                           child: Text(product['name']),
                         );
                       }).toList(),
