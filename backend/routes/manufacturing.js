@@ -5,6 +5,8 @@ const ManufacturingBatch = require('../models/ManufacturingBatch');
 const MasterProduct = require('../models/MasterProduct');
 const Product = require('../models/Product');
 const InventoryLog = require('../models/InventoryLog');
+const Recipe = require('../models/Recipe');
+const RawMaterial = require('../models/RawMaterial');
 
 // @desc    Submit a new manufacturing batch (saved as PENDING APPROVAL)
 // @route   POST /api/manufacturing/batch
@@ -197,6 +199,53 @@ router.post('/batch/:id/approve', protect, async (req, res) => {
     session.endSession();
     console.error('Error approving manufacturing batch:', error);
     res.status(500).json({ success: false, message: error.message || 'Server error' });
+  }
+});
+
+// @desc    Validate stock for a manufacturing batch
+// @route   POST /api/manufacturing/validate-stock
+// @access  Private
+router.post('/validate-stock', protect, async (req, res) => {
+  try {
+    const { productId, batchSize } = req.body;
+    
+    const recipe = await Recipe.findOne({ productId }).populate('ingredients.rawMaterialId');
+    if (!recipe) {
+      return res.status(404).json({ success: false, message: 'Recipe not found for this product' });
+    }
+
+    const validationResults = [];
+    let isStockSufficient = true;
+
+    for (let ingredient of recipe.ingredients) {
+      // Calculate required amount for this batch size
+      const requiredQty = (ingredient.requiredQuantity / recipe.baseBatchSize) * batchSize;
+      const rawMaterial = ingredient.rawMaterialId;
+      
+      const availableQty = rawMaterial ? rawMaterial.currentStock : 0;
+      const isSufficient = availableQty >= requiredQty;
+      
+      if (!isSufficient) {
+        isStockSufficient = false;
+      }
+      
+      validationResults.push({
+        rawMaterialId: rawMaterial ? rawMaterial._id : null,
+        rawMaterialName: rawMaterial ? rawMaterial.name : 'Unknown',
+        requiredQty,
+        availableQty,
+        isSufficient
+      });
+    }
+
+    res.json({
+      success: true,
+      isStockSufficient,
+      ingredients: validationResults
+    });
+  } catch (error) {
+    console.error('Error validating stock:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
   }
 });
 

@@ -15,6 +15,10 @@ import '../shop/category_list_screen.dart';
 import '../users/manage_users_screen.dart';
 import '../profile/edit_profile_screen.dart';
 import '../seller/seller_main_screen.dart';
+import '../admin/manufacturing_process_screen.dart';
+import '../stock/inventory_dashboard_screen.dart';
+import '../stock/raw_material_entry_screen.dart';
+import '../stock/manufacturing_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({Key? key}) : super(key: key);
@@ -132,7 +136,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         .where((s) => s.dateTime.isAfter(monthStart))
         .fold<double>(0, (prev, s) => prev + s.finalAmount);
 
-    final lowStockProducts = db.products.where((p) => p.remainingStock < 50.0).toList();
+    final lowStockProducts = db.masterProducts.where((p) => p.totalStockKg < 20.0).toList();
 
     final rupeeFormat = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0);
 
@@ -293,9 +297,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           children: [
                             Text(p.name, style: const TextStyle(fontWeight: FontWeight.w500)),
                             Text(
-                              '${p.remainingStock.toStringAsFixed(1)} kg left',
+                              '${p.totalStockKg.toStringAsFixed(1)} kg left',
                               style: TextStyle(
-                                color: p.remainingStock == 0 ? AppColors.outOfStockAlert : AppColors.lowStockAlert,
+                                color: p.totalStockKg == 0 ? AppColors.outOfStockAlert : AppColors.lowStockAlert,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
@@ -356,6 +360,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
             scrollDirection: Axis.horizontal,
             child: Row(
               children: [
+                if (Permissions.isSuperAdmin(db.currentUserProfile?.role))
+                  _buildActionButton(context, Icons.inventory, 'Raw Materials', () {
+                    Navigator.of(context).push(MaterialPageRoute(builder: (_) => const RawMaterialEntryScreen()));
+                  }),
+                if (Permissions.isSuperAdmin(db.currentUserProfile?.role))
+                  _buildActionButton(context, Icons.precision_manufacturing, 'Manufacture', () {
+                    Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ManufacturingScreen()));
+                  }),
                 if (Permissions.isSuperAdmin(db.currentUserProfile?.role))
                   _buildActionButton(context, Icons.security, 'Manage Sellers', () {
                     Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ManageUsersScreen()));
