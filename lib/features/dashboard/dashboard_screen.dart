@@ -17,7 +17,7 @@ import '../profile/edit_profile_screen.dart';
 import '../seller/seller_main_screen.dart';
 import '../admin/manufacturing_process_screen.dart';
 import '../stock/inventory_dashboard_screen.dart';
-import '../stock/raw_material_entry_screen.dart';
+import '../stock/raw_material_stock_screen.dart';
 import '../stock/manufacturing_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -362,7 +362,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               children: [
                 if (Permissions.isSuperAdmin(db.currentUserProfile?.role))
                   _buildActionButton(context, Icons.inventory, 'Raw Materials', () {
-                    Navigator.of(context).push(MaterialPageRoute(builder: (_) => const RawMaterialEntryScreen()));
+                    Navigator.of(context).push(MaterialPageRoute(builder: (_) => const RawMaterialStockScreen()));
                   }),
                 if (Permissions.isSuperAdmin(db.currentUserProfile?.role))
                   _buildActionButton(context, Icons.precision_manufacturing, 'Manufacture', () {

@@ -8,10 +8,31 @@ import '../../core/permissions.dart';
 import 'batch_detail_screen.dart';
 
 class ManufacturingProcessScreen extends StatefulWidget {
-  const ManufacturingProcessScreen({Key? key}) : super(key: key);
+  final String? initialTargetProductId;
+  final List<dynamic>? prefilledIngredients;
+  
+  const ManufacturingProcessScreen({
+    Key? key, 
+    this.initialTargetProductId,
+    this.prefilledIngredients,
+  }) : super(key: key);
 
   @override
   State<ManufacturingProcessScreen> createState() => _ManufacturingProcessScreenState();
+}
+
+class RawMaterialControllers {
+  final TextEditingController name = TextEditingController();
+  final TextEditingController qty = TextEditingController();
+  final TextEditingController amount = TextEditingController();
+  final TextEditingController gst = TextEditingController();
+
+  void dispose() {
+    name.dispose();
+    qty.dispose();
+    amount.dispose();
+    gst.dispose();
+  }
 }
 
 class _ManufacturingProcessScreenState extends State<ManufacturingProcessScreen> {
@@ -20,10 +41,7 @@ class _ManufacturingProcessScreenState extends State<ManufacturingProcessScreen>
   final ManufacturingBatch _batch = ManufacturingBatch();
 
   // Controllers for Step 2
-  final _rawMaterialNameController = TextEditingController();
-  final _rawMaterialQtyController = TextEditingController();
-  final _rawMaterialAmountController = TextEditingController();
-  final _gstController = TextEditingController();
+  final List<RawMaterialControllers> _rawMaterialsList = [RawMaterialControllers()];
 
   // Controllers for Step 3
   final _beforeDryingController = TextEditingController();
@@ -36,19 +54,68 @@ class _ManufacturingProcessScreenState extends State<ManufacturingProcessScreen>
   @override
   void initState() {
     super.initState();
+    
+    // Pre-fill from previous validation screen if available
+    if (widget.initialTargetProductId != null) {
+      _batch.targetProductId = widget.initialTargetProductId;
+      // We will set targetProductName after master products load if needed, or assume it's prefilled properly
+    }
+    
+    if (widget.prefilledIngredients != null && widget.prefilledIngredients!.isNotEmpty) {
+      _rawMaterialsList.clear();
+      for (var ingredient in widget.prefilledIngredients!) {
+        final controllers = RawMaterialControllers();
+        controllers.name.text = ingredient['rawMaterialName'] ?? '';
+        controllers.qty.text = (ingredient['requiredQty'] as num?)?.toStringAsFixed(2) ?? '';
+        _rawMaterialsList.add(controllers);
+      }
+    }
+    
     // Listeners for auto calculations
     _beforeDryingController.addListener(_updateBatch);
     _afterDryingController.addListener(_updateBatch);
     _beforeGrindingController.addListener(_updateBatch);
     _afterGrindingController.addListener(_updateBatch);
-    _rawMaterialAmountController.addListener(_updateBatchCost);
-    _gstController.addListener(_updateBatchCost);
+    for (var controllers in _rawMaterialsList) {
+      controllers.amount.addListener(_updateBatchCost);
+      controllers.gst.addListener(_updateBatchCost);
+      controllers.qty.addListener(_updateBatchCost);
+      controllers.name.addListener(_updateBatchCost);
+    }
+  }
+
+  void _addIngredientForm() {
+    setState(() {
+      final controllers = RawMaterialControllers();
+      controllers.amount.addListener(_updateBatchCost);
+      controllers.gst.addListener(_updateBatchCost);
+      controllers.qty.addListener(_updateBatchCost);
+      controllers.name.addListener(_updateBatchCost);
+      _rawMaterialsList.add(controllers);
+    });
+  }
+
+  void _removeIngredientForm(int index) {
+    setState(() {
+      _rawMaterialsList[index].dispose();
+      _rawMaterialsList.removeAt(index);
+      _updateBatchCost();
+    });
   }
 
   void _updateBatchCost() {
     setState(() {
-      _batch.rawMaterialAmount = double.tryParse(_rawMaterialAmountController.text);
-      _batch.gstPercentage = double.tryParse(_gstController.text);
+      _batch.rawMaterials.clear();
+      for (var controllers in _rawMaterialsList) {
+        if (controllers.name.text.isNotEmpty || controllers.qty.text.isNotEmpty) {
+          _batch.rawMaterials.add(RawMaterialItem(
+            name: controllers.name.text,
+            quantity: double.tryParse(controllers.qty.text) ?? 0,
+            amount: double.tryParse(controllers.amount.text),
+            gstPercentage: double.tryParse(controllers.gst.text),
+          ));
+        }
+      }
     });
   }
 
@@ -63,10 +130,9 @@ class _ManufacturingProcessScreenState extends State<ManufacturingProcessScreen>
 
   @override
   void dispose() {
-    _rawMaterialNameController.dispose();
-    _rawMaterialQtyController.dispose();
-    _rawMaterialAmountController.dispose();
-    _gstController.dispose();
+    for (var controllers in _rawMaterialsList) {
+      controllers.dispose();
+    }
     _beforeDryingController.dispose();
     _afterDryingController.dispose();
     _beforeGrindingController.dispose();
@@ -103,10 +169,12 @@ class _ManufacturingProcessScreenState extends State<ManufacturingProcessScreen>
         // Reset form
         setState(() {
           _currentStep = 0;
-          _rawMaterialNameController.clear();
-          _rawMaterialQtyController.clear();
-          _rawMaterialAmountController.clear();
-          _gstController.clear();
+          for (var controllers in _rawMaterialsList) {
+            controllers.dispose();
+          }
+          _rawMaterialsList.clear();
+          _addIngredientForm();
+          _batch.rawMaterials.clear();
           _beforeDryingController.clear();
           _afterDryingController.clear();
           _beforeGrindingController.clear();
@@ -114,9 +182,6 @@ class _ManufacturingProcessScreenState extends State<ManufacturingProcessScreen>
           _batch.targetProductId = null;
           _batch.targetProductName = null;
         });
-
-        // Switch to the second tab
-        DefaultTabController.of(context).animateTo(1);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Failed to submit batch process'))
@@ -216,16 +281,21 @@ class _ManufacturingProcessScreenState extends State<ManufacturingProcessScreen>
                  }
               }
               if (_currentStep == 1) {
-                final qty = double.tryParse(_rawMaterialQtyController.text) ?? 0;
-                if (qty <= 0) {
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter a valid raw material quantity.')));
+                if (_batch.rawMaterials.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please add at least one raw material.')));
                   return;
                 }
-                _batch.rawMaterialName = _rawMaterialNameController.text;
-                _batch.rawMaterialQuantity = qty;
-                _batch.rawMaterialAmount = double.tryParse(_rawMaterialAmountController.text);
-                _batch.gstPercentage = double.tryParse(_gstController.text);
-                _beforeDryingController.text = _batch.rawMaterialQuantity.toString();
+                for (var item in _batch.rawMaterials) {
+                  if (item.name.isEmpty || item.quantity <= 0) {
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter valid name and quantity for all materials.')));
+                    return;
+                  }
+                }
+                // Backward compatibility just in case
+                _batch.rawMaterialName = _batch.rawMaterials.map((e) => e.name).join(', ');
+                _batch.rawMaterialQuantity = _batch.totalRawMaterialQuantity;
+                
+                _beforeDryingController.text = _batch.totalRawMaterialQuantity.toString();
               }
               if (_currentStep == 2) {
                  final before = double.tryParse(_beforeDryingController.text) ?? 0;
@@ -298,55 +368,88 @@ class _ManufacturingProcessScreenState extends State<ManufacturingProcessScreen>
                 content: _buildStepCard(
                   child: Column(
                     children: [
-                      TextFormField(
-                        controller: _rawMaterialNameController,
-                        decoration: const InputDecoration(
-                          labelText: 'Material Name', 
-                          border: OutlineInputBorder(),
-                          prefixIcon: Icon(Icons.eco_outlined),
+                      ...List.generate(_rawMaterialsList.length, (index) {
+                        final controllers = _rawMaterialsList[index];
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 16),
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Colors.grey.shade300),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              if (_rawMaterialsList.length > 1)
+                                IconButton(
+                                  icon: const Icon(Icons.close, color: Colors.red),
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(),
+                                  onPressed: () => _removeIngredientForm(index),
+                                ),
+                              TextFormField(
+                                controller: controllers.name,
+                                decoration: const InputDecoration(
+                                  labelText: 'Material Name', 
+                                  border: OutlineInputBorder(),
+                                  prefixIcon: Icon(Icons.eco_outlined),
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              TextFormField(
+                                controller: controllers.qty,
+                                decoration: const InputDecoration(
+                                  labelText: 'Quantity (kg)', 
+                                  border: OutlineInputBorder(),
+                                  prefixIcon: Icon(Icons.scale_outlined),
+                                ),
+                                keyboardType: TextInputType.number,
+                              ),
+                              const SizedBox(height: 12),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    flex: 2,
+                                    child: TextFormField(
+                                      controller: controllers.amount,
+                                      decoration: const InputDecoration(
+                                        labelText: 'Total Amount (₹) (Optional)', 
+                                        border: OutlineInputBorder(),
+                                        prefixIcon: Icon(Icons.currency_rupee),
+                                      ),
+                                      keyboardType: TextInputType.number,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    flex: 1,
+                                    child: TextFormField(
+                                      controller: controllers.gst,
+                                      decoration: const InputDecoration(
+                                        labelText: 'GST %', 
+                                        border: OutlineInputBorder(),
+                                        suffixText: '%',
+                                      ),
+                                      keyboardType: TextInputType.number,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        );
+                      }),
+                      
+                      TextButton.icon(
+                        onPressed: _addIngredientForm,
+                        icon: const Icon(Icons.add_circle_outline),
+                        label: const Text('Add Another Ingredient'),
+                        style: TextButton.styleFrom(
+                          foregroundColor: Theme.of(context).primaryColor,
                         ),
                       ),
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        controller: _rawMaterialQtyController,
-                        decoration: const InputDecoration(
-                          labelText: 'Quantity (kg)', 
-                          border: OutlineInputBorder(),
-                          prefixIcon: Icon(Icons.scale_outlined),
-                        ),
-                        keyboardType: TextInputType.number,
-                      ),
-                      const SizedBox(height: 16),
-                      Row(
-                        children: [
-                          Expanded(
-                            flex: 2,
-                            child: TextFormField(
-                              controller: _rawMaterialAmountController,
-                              decoration: const InputDecoration(
-                                labelText: 'Total Amount (₹)', 
-                                border: OutlineInputBorder(),
-                                prefixIcon: Icon(Icons.currency_rupee),
-                              ),
-                              keyboardType: TextInputType.number,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            flex: 1,
-                            child: TextFormField(
-                              controller: _gstController,
-                              decoration: const InputDecoration(
-                                labelText: 'GST %', 
-                                border: OutlineInputBorder(),
-                                suffixText: '%',
-                              ),
-                              keyboardType: TextInputType.number,
-                            ),
-                          ),
-                        ],
-                      ),
-                      if ((_batch.rawMaterialAmount ?? 0) > 0)
+                      
+                      if ((_batch.totalCost) > 0)
                         Padding(
                           padding: const EdgeInsets.only(top: 12.0),
                           child: Container(
@@ -502,10 +605,22 @@ class _ManufacturingProcessScreenState extends State<ManufacturingProcessScreen>
                         
                         const Text('Financials & Input', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
                         const SizedBox(height: 8),
-                        _buildReportRow('Raw Material', '${_batch.rawMaterialName} (${_batch.rawMaterialQuantity} kg)'),
-                        _buildReportRow('Amount', '₹${_batch.rawMaterialAmount?.toStringAsFixed(2) ?? '0.00'}'),
-                        _buildReportRow('GST (${_batch.gstPercentage ?? 0}%)', '₹${_batch.totalGstAmount.toStringAsFixed(2)}'),
-                        _buildReportRow('Total Cost', '₹${_batch.totalCost.toStringAsFixed(2)}', isBold: true),
+                        ..._batch.rawMaterials.map((item) {
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 8.0),
+                            child: Column(
+                              children: [
+                                _buildReportRow('Material', '${item.name} (${item.quantity} kg)'),
+                                if ((item.amount ?? 0) > 0)
+                                  _buildReportRow('Cost', '₹${item.amount?.toStringAsFixed(2)} (+${item.gstPercentage ?? 0}% GST)'),
+                              ],
+                            ),
+                          );
+                        }).toList(),
+                        if (_batch.totalCost > 0)
+                          const Divider(height: 16),
+                        if (_batch.totalCost > 0)
+                          _buildReportRow('Total Cost', '₹${_batch.totalCost.toStringAsFixed(2)}', isBold: true),
                         
                         const SizedBox(height: 16),
                         const Text('Processing Metrics', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
@@ -706,7 +821,7 @@ class _MonthlyBatchListState extends State<_MonthlyBatchList> {
                                   ),
                                   const SizedBox(height: 8),
                                   Text(
-                                    'Raw Material: ${batch.rawMaterialName} (${batch.rawMaterialQuantity} kg)',
+                                    'Raw Material: ${batch.rawMaterials.isNotEmpty ? batch.rawMaterials.map((e) => e.name).join(', ') : batch.rawMaterialName} (${batch.totalRawMaterialQuantity} kg)',
                                     style: TextStyle(color: Colors.grey.shade700, fontSize: 13),
                                   ),
                                   const SizedBox(height: 4),

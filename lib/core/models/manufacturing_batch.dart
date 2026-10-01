@@ -1,3 +1,34 @@
+class RawMaterialItem {
+  String name;
+  double quantity;
+  double? amount;
+  double? gstPercentage;
+
+  RawMaterialItem({
+    required this.name,
+    required this.quantity,
+    this.amount,
+    this.gstPercentage,
+  });
+
+  double get totalGstAmount => (amount ?? 0) * ((gstPercentage ?? 0) / 100);
+  double get totalCost => (amount ?? 0) + totalGstAmount;
+
+  Map<String, dynamic> toMap() => {
+    'name': name,
+    'quantity': quantity,
+    'amount': amount,
+    'gstPercentage': gstPercentage,
+  };
+
+  factory RawMaterialItem.fromMap(Map<String, dynamic> map) => RawMaterialItem(
+    name: map['name'] ?? '',
+    quantity: (map['quantity'] as num?)?.toDouble() ?? 0.0,
+    amount: (map['amount'] as num?)?.toDouble(),
+    gstPercentage: (map['gstPercentage'] as num?)?.toDouble(),
+  );
+}
+
 class ManufacturingBatch {
   ManufacturingBatch();
 
@@ -17,8 +48,29 @@ class ManufacturingBatch {
   double? rawMaterialAmount;
   double? gstPercentage;
 
-  double get totalGstAmount => (rawMaterialAmount ?? 0) * ((gstPercentage ?? 0) / 100);
-  double get totalCost => (rawMaterialAmount ?? 0) + totalGstAmount;
+  List<RawMaterialItem> rawMaterials = [];
+
+  double get totalGstAmount {
+    if (rawMaterials.isNotEmpty) {
+      return rawMaterials.fold(0.0, (sum, item) => sum + item.totalGstAmount);
+    }
+    return (rawMaterialAmount ?? 0) * ((gstPercentage ?? 0) / 100);
+  }
+  
+  double get totalCost {
+    if (rawMaterials.isNotEmpty) {
+      return rawMaterials.fold(0.0, (sum, item) => sum + item.totalCost);
+    }
+    return (rawMaterialAmount ?? 0) + totalGstAmount;
+  }
+
+  double get totalRawMaterialQuantity {
+    if (rawMaterials.isNotEmpty) {
+      return rawMaterials.fold(0.0, (sum, item) => sum + item.quantity);
+    }
+    return rawMaterialQuantity ?? 0;
+  }
+
 
   double? weightBeforeDrying;
   double? weightAfterDrying;
@@ -34,8 +86,8 @@ class ManufacturingBatch {
 
   double get totalLoss => dryingLoss + grindingLoss;
 
-  double get yieldPercentage => (rawMaterialQuantity != null && rawMaterialQuantity! > 0)
-      ? (finalOutputWeight / rawMaterialQuantity!) * 100
+  double get yieldPercentage => (totalRawMaterialQuantity > 0)
+      ? (finalOutputWeight / totalRawMaterialQuantity) * 100
       : 0;
 
   Map<String, dynamic> toMap() {
@@ -46,6 +98,7 @@ class ManufacturingBatch {
       'rawMaterialQuantity': rawMaterialQuantity,
       'rawMaterialAmount': rawMaterialAmount,
       'gstPercentage': gstPercentage,
+      'rawMaterials': rawMaterials.map((e) => e.toMap()).toList(),
       'totalGstAmount': totalGstAmount,
       'totalCost': totalCost,
       'weightBeforeDrying': weightBeforeDrying,
@@ -73,6 +126,10 @@ class ManufacturingBatch {
     batch.rawMaterialQuantity = (map['rawMaterialQuantity'] as num?)?.toDouble();
     batch.rawMaterialAmount = (map['rawMaterialAmount'] as num?)?.toDouble();
     batch.gstPercentage = (map['gstPercentage'] as num?)?.toDouble();
+    
+    if (map['rawMaterials'] != null) {
+      batch.rawMaterials = (map['rawMaterials'] as List).map((e) => RawMaterialItem.fromMap(e)).toList();
+    }
     batch.weightBeforeDrying = (map['weightBeforeDrying'] as num?)?.toDouble();
     batch.weightAfterDrying = (map['weightAfterDrying'] as num?)?.toDouble();
     batch.weightBeforeGrinding = (map['weightBeforeGrinding'] as num?)?.toDouble();

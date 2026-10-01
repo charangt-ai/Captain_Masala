@@ -42,7 +42,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     // Step 1: Initialize DatabaseService (reads JWT token from storage)
     bool isAuth = false;
     try {
-      isAuth = await db.init().timeout(const Duration(seconds: 5));
+      isAuth = await db.init().timeout(const Duration(seconds: 60));
     } catch (_) {
       // Init timed out — proceed anyway
     }
@@ -103,6 +103,11 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
               SizedBox(height: 48),
               CircularProgressIndicator(
                 valueColor: AlwaysStoppedAnimation<Color>(Colors.red),
+              ),
+              SizedBox(height: 16),
+              Text(
+                'Connecting to server...',
+                style: TextStyle(color: Colors.grey, fontSize: 14),
               ),
             ],
           ),

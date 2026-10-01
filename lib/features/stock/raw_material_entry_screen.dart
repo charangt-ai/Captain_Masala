@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import '../../../core/constants.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import '../../core/services/api_config.dart';
 
 class RawMaterialEntryScreen extends StatefulWidget {
   const RawMaterialEntryScreen({Key? key}) : super(key: key);
@@ -30,11 +31,14 @@ class _RawMaterialEntryScreenState extends State<RawMaterialEntryScreen> {
     });
 
     try {
+      final storage = const FlutterSecureStorage();
+      final token = await storage.read(key: 'jwt_token');
+
       final response = await http.post(
-        Uri.parse('${Constants.apiBaseUrl}/inventory/raw-materials'),
+        Uri.parse('${ApiConfig.baseUrl}/inventory/raw-materials'),
         headers: {
           'Content-Type': 'application/json',
-          // Add auth token if available/required
+          if (token != null) 'Authorization': 'Bearer $token',
         },
         body: json.encode({
           'name': _nameController.text.trim(),

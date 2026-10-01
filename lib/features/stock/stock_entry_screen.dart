@@ -81,7 +81,7 @@ class _StockEntryScreenState extends State<StockEntryScreen> {
                           setState(() {
                             _selectedProduct = val;
                             if (val != null) {
-                              _stockController.text = val.totalStockKg.toString();
+                              _stockController.text = ''; // Start empty to ask for amount to add
                             }
                           });
                         },
@@ -93,7 +93,7 @@ class _StockEntryScreenState extends State<StockEntryScreen> {
                       TextFormField(
                         controller: _stockController,
                         decoration: const InputDecoration(
-                          labelText: 'New Stock Level (kg)',
+                          labelText: 'Stock to Add (kg)',
                           prefixIcon: Icon(Icons.scale),
                           suffixText: 'kg',
                         ),
@@ -125,7 +125,8 @@ class _StockEntryScreenState extends State<StockEntryScreen> {
                         onPressed: () async {
                           if (!_formKey.currentState!.validate() || _selectedProduct == null) return;
 
-                          final newStock = double.parse(_stockController.text);
+                          final amountToAdd = double.parse(_stockController.text);
+                          final newStock = _selectedProduct!.totalStockKg + amountToAdd;
                           
                           // Show loading indicator or disable button if needed in a real app, 
                           // but for simplicity we'll just await the result here.

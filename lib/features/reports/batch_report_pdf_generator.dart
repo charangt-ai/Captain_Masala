@@ -121,7 +121,20 @@ class BatchReportPdfGenerator {
                         children: [
                           pw.Text('RAW MATERIAL', style: pw.TextStyle(fontSize: 9, color: primaryOrange, fontWeight: pw.FontWeight.bold)),
                           pw.SizedBox(height: 4),
-                          pw.Text('${batch.rawMaterialName} (${batch.rawMaterialQuantity} kg)', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold, color: tableHeaderDark)),
+                          if (batch.rawMaterials.isNotEmpty)
+                            ...batch.rawMaterials.asMap().entries.map((e) {
+                              int index = e.key + 1;
+                              var item = e.value;
+                              return pw.Padding(
+                                padding: const pw.EdgeInsets.only(top: 2),
+                                child: pw.Text(
+                                  '$index. ${item.name} - ${item.quantity} kg - Rs. ${item.amount ?? 0}', 
+                                  style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold, color: tableHeaderDark)
+                                ),
+                              );
+                            }).toList()
+                          else
+                            pw.Text('${batch.rawMaterialName} (${batch.rawMaterialQuantity} kg)', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold, color: tableHeaderDark)),
                         ],
                       ),
                     ),
@@ -241,9 +254,19 @@ class BatchReportPdfGenerator {
                           child: pw.Text('COST SUMMARY', style: pw.TextStyle(color: PdfColors.white, fontSize: 10, fontWeight: pw.FontWeight.bold)),
                         ),
                         
-                        _buildSummaryRow('Raw Material Amount', currencyFormat.format(batch.rawMaterialAmount ?? 0)),
+                        _buildSummaryRow(
+                          'Raw Material Amount', 
+                          currencyFormat.format(batch.rawMaterials.isNotEmpty 
+                            ? batch.rawMaterials.fold(0.0, (sum, item) => sum + (item.amount ?? 0))
+                            : (batch.rawMaterialAmount ?? 0))
+                        ),
                         pw.Divider(height: 0, color: dividerColor),
-                        _buildSummaryRow('GST (${batch.gstPercentage}%)', currencyFormat.format(batch.totalGstAmount)),
+                        _buildSummaryRow(
+                          batch.rawMaterials.isNotEmpty 
+                            ? 'Total GST' 
+                            : 'GST (${batch.gstPercentage}%)', 
+                          currencyFormat.format(batch.totalGstAmount)
+                        ),
                         
                         pw.Container(
                           width: double.infinity,

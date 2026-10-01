@@ -71,6 +71,49 @@ class UserProfileViewScreen extends StatelessWidget {
                 minimumSize: const Size.fromHeight(50),
               ),
             ),
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+              icon: const Icon(Icons.delete_forever),
+              label: const Text('Delete Account'),
+              onPressed: () async {
+                final confirm = await showDialog<bool>(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    title: const Text('Delete Account', style: TextStyle(color: AppColors.primaryRed)),
+                    content: Text('Are you sure you want to permanently delete ${user.name.isNotEmpty ? user.name : user.email}?\n\nThis action cannot be undone and they will lose all access to the app.'),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx, false),
+                        child: const Text('Cancel'),
+                      ),
+                      ElevatedButton(
+                        onPressed: () => Navigator.pop(ctx, true),
+                        style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryRed),
+                        child: const Text('Delete', style: TextStyle(color: Colors.white)),
+                      ),
+                    ],
+                  ),
+                );
+
+                if (confirm == true) {
+                  final db = Provider.of<DatabaseService>(context, listen: false);
+                  await db.deleteUser(user.id);
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Account deleted permanently')),
+                    );
+                    onRoleChanged(); // Refreshes the list
+                    Navigator.pop(context); // Go back to the list
+                  }
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.white,
+                foregroundColor: AppColors.primaryRed,
+                side: const BorderSide(color: AppColors.primaryRed),
+                minimumSize: const Size.fromHeight(50),
+              ),
+            ),
           ],
         ),
       ),

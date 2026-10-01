@@ -1,4 +1,7 @@
 class ApiConfig {
-  // We are using your computer's local Wi-Fi IP address so your phone can connect to it.
-  static const String baseUrl = 'http://10.203.118.148:3000/api';
+  // Live Production URL (Render)
+  static const String baseUrl = 'https://captain-masala.onrender.com/api';
+  
+  // Local Development URL (Your Laptop IP) - Uncomment this if you need to run the server locally again
+  // static const String baseUrl = 'http://10.203.118.148:3000/api';
 }

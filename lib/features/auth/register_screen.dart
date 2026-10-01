@@ -72,8 +72,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
       Navigator.of(context).pop();
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Registration failed! Email might be in use or invalid.'),
+        SnackBar(
+          content: Text(result == 'network_error' ? 'Network error. Please check your connection.' : result),
           backgroundColor: AppColors.outOfStockAlert,
         ),
       );

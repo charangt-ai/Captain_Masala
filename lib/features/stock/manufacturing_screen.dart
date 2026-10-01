@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import '../../../core/constants.dart';
+import '../../core/services/api_config.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import '../admin/manufacturing_process_screen.dart';
 
 class ManufacturingScreen extends StatefulWidget {
   const ManufacturingScreen({Key? key}) : super(key: key);
@@ -28,8 +30,15 @@ class _ManufacturingScreenState extends State<ManufacturingScreen> {
 
   Future<void> _fetchMasterProducts() async {
     try {
+      final storage = const FlutterSecureStorage();
+      final token = await storage.read(key: 'jwt_token');
+      
       final response = await http.get(
-        Uri.parse('${Constants.apiBaseUrl}/master-products'),
+        Uri.parse('${ApiConfig.baseUrl}/master-products'),
+        headers: {
+          'Content-Type': 'application/json',
+          if (token != null) 'Authorization': 'Bearer $token',
+        },
       );
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -50,9 +59,15 @@ class _ManufacturingScreenState extends State<ManufacturingScreen> {
     });
 
     try {
+      final storage = const FlutterSecureStorage();
+      final token = await storage.read(key: 'jwt_token');
+
       final response = await http.post(
-        Uri.parse('${Constants.apiBaseUrl}/manufacturing/validate-stock'),
-        headers: {'Content-Type': 'application/json'},
+        Uri.parse('${ApiConfig.baseUrl}/manufacturing/validate-stock'),
+        headers: {
+          'Content-Type': 'application/json',
+          if (token != null) 'Authorization': 'Bearer $token',
+        },
         body: json.encode({
           'productId': _selectedProductId,
           'batchSize': double.parse(_batchSizeController.text),
@@ -82,10 +97,13 @@ class _ManufacturingScreenState extends State<ManufacturingScreen> {
   }
 
   void _startManufacturing() {
-    // Navigate to the next step: Multi-stage stepper (Drying, Grinding, Blending)
-    // We would pass the validated batch details here.
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Proceeding to manufacturing stages...')),
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(
+        builder: (_) => ManufacturingProcessScreen(
+          initialTargetProductId: _selectedProductId,
+          prefilledIngredients: _validationResults,
+        ),
+      ),
     );
   }
 
