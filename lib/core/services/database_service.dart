@@ -189,10 +189,19 @@ class DatabaseService extends ChangeNotifier {
   Future<void> _fetchMasterProducts() async {
     final res = await http.get(Uri.parse('${ApiConfig.baseUrl}/master-products'), headers: await _getHeaders());
     if (res.statusCode == 200) {
-      final List data = json.decode(res.body);
+      final decoded = json.decode(res.body);
+      List<dynamic> data = [];
+      if (decoded is List) {
+        data = decoded;
+      } else if (decoded is Map<String, dynamic>) {
+        final inner = decoded['data'];
+        if (inner is List) {
+          data = inner;
+        }
+      }
       _masterProducts = data.map((json) => MasterProduct(
-        id: json['id'],
-        name: json['name'],
+        id: json['id'] ?? json['_id'] ?? '',
+        name: json['name'] ?? '',
         totalStockKg: (json['totalStockKg'] ?? 0).toDouble(),
       )).toList();
       notifyListeners();

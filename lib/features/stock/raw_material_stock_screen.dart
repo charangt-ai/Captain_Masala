@@ -43,10 +43,25 @@ class _RawMaterialStockScreenState extends State<RawMaterialStockScreen> {
       );
 
       if (response.statusCode == 200) {
-        final Map<String, dynamic> responseData = json.decode(response.body);
+        final decoded = json.decode(response.body);
+        List<dynamic> materials = [];
+
+        if (decoded is List) {
+          // Backend returned a plain array
+          materials = decoded;
+        } else if (decoded is Map<String, dynamic>) {
+          // Backend returned a wrapper object — extract 'data'
+          final data = decoded['data'];
+          if (data is List) {
+            materials = data;
+          } else if (data is Map) {
+            // Single item returned instead of array — wrap it
+            materials = [data];
+          }
+        }
+
         setState(() {
-          // Extract the array from the 'data' key in the response wrapper
-          _inventory = responseData['data'] ?? []; 
+          _inventory = materials;
           _isLoading = false;
         });
       } else {

@@ -41,9 +41,20 @@ class _ManufacturingScreenState extends State<ManufacturingScreen> {
         },
       );
       if (response.statusCode == 200) {
-        final data = json.decode(response.body);
+        final decoded = json.decode(response.body);
+        List<dynamic> products = [];
+
+        if (decoded is List) {
+          products = decoded;
+        } else if (decoded is Map<String, dynamic>) {
+          final data = decoded['data'];
+          if (data is List) {
+            products = data;
+          }
+        }
+
         setState(() {
-          _masterProducts = data;
+          _masterProducts = products;
         });
       }
     } catch (e) {
