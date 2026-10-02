@@ -55,6 +55,10 @@ class _ManufacturingProcessScreenState extends State<ManufacturingProcessScreen>
   void initState() {
     super.initState();
     
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Provider.of<DatabaseService>(context, listen: false).fetchRawMaterials();
+    });
+    
     // Pre-fill from previous validation screen if available
     if (widget.initialTargetProductId != null) {
       _batch.targetProductId = widget.initialTargetProductId;

@@ -116,7 +116,7 @@ class DatabaseService extends ChangeNotifier {
         _fetchCustomers(),
         _fetchCategories(),
         _fetchMasterProducts(),
-        _fetchRawMaterials(),
+        fetchRawMaterials(),
         _fetchSales(reset: true),
         _fetchLogs(reset: true),
       ]);
@@ -212,7 +212,7 @@ class DatabaseService extends ChangeNotifier {
     }
   }
 
-  Future<void> _fetchRawMaterials() async {
+  Future<void> fetchRawMaterials() async {
     final res = await http.get(Uri.parse('${ApiConfig.baseUrl}/inventory/raw-materials'), headers: await _getHeaders());
     if (res.statusCode == 200) {
       final decoded = json.decode(res.body);
