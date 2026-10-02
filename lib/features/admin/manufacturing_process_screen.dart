@@ -287,8 +287,20 @@ class _ManufacturingProcessScreenState extends State<ManufacturingProcessScreen>
                 }
                 for (var item in _batch.rawMaterials) {
                   if (item.name.isEmpty || item.quantity <= 0) {
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter valid name and quantity for all materials.')));
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please select material and enter valid quantity for all items.')));
                     return;
+                  }
+                  
+                  // Check stock
+                  final rmDoc = db.rawMaterials.firstWhere((r) => r['name'] == item.name, orElse: () => null);
+                  if (rmDoc == null) {
+                     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${item.name} not found in inventory.')));
+                     return;
+                  }
+                  final double stock = (rmDoc['currentStock'] as num?)?.toDouble() ?? 0;
+                  if (item.quantity > stock) {
+                     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Not enough stock for ${item.name}. Available: $stock kg')));
+                     return;
                   }
                 }
                 // Backward compatibility just in case
@@ -387,13 +399,25 @@ class _ManufacturingProcessScreenState extends State<ManufacturingProcessScreen>
                                   constraints: const BoxConstraints(),
                                   onPressed: () => _removeIngredientForm(index),
                                 ),
-                              TextFormField(
-                                controller: controllers.name,
+                              DropdownButtonFormField<String>(
+                                value: controllers.name.text.isEmpty ? null : controllers.name.text,
                                 decoration: const InputDecoration(
                                   labelText: 'Material Name', 
                                   border: OutlineInputBorder(),
                                   prefixIcon: Icon(Icons.eco_outlined),
                                 ),
+                                items: db.rawMaterials.map((rm) {
+                                  return DropdownMenuItem<String>(
+                                    value: rm['name'],
+                                    child: Text('${rm['name']} (Stock: ${rm['currentStock']} ${rm['unit']})'),
+                                  );
+                                }).toList(),
+                                onChanged: (val) {
+                                  setState(() {
+                                    controllers.name.text = val ?? '';
+                                    _updateBatchCost();
+                                  });
+                                },
                               ),
                               const SizedBox(height: 12),
                               TextFormField(

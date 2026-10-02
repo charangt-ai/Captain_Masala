@@ -116,6 +116,7 @@ class DatabaseService extends ChangeNotifier {
         _fetchCustomers(),
         _fetchCategories(),
         _fetchMasterProducts(),
+        _fetchRawMaterials(),
         _fetchSales(reset: true),
         _fetchLogs(reset: true),
       ]);
@@ -186,6 +187,9 @@ class DatabaseService extends ChangeNotifier {
     }
   }
 
+  List<dynamic> _rawMaterials = [];
+  List<dynamic> get rawMaterials => _rawMaterials;
+
   Future<void> _fetchMasterProducts() async {
     final res = await http.get(Uri.parse('${ApiConfig.baseUrl}/master-products'), headers: await _getHeaders());
     if (res.statusCode == 200) {
@@ -204,6 +208,27 @@ class DatabaseService extends ChangeNotifier {
         name: json['name'] ?? '',
         totalStockKg: (json['totalStockKg'] ?? 0).toDouble(),
       )).toList();
+      notifyListeners();
+    }
+  }
+
+  Future<void> _fetchRawMaterials() async {
+    final res = await http.get(Uri.parse('${ApiConfig.baseUrl}/inventory/raw-materials'), headers: await _getHeaders());
+    if (res.statusCode == 200) {
+      final decoded = json.decode(res.body);
+      List<dynamic> materials = [];
+
+      if (decoded is List) {
+        materials = decoded;
+      } else if (decoded is Map<String, dynamic>) {
+        final data = decoded['data'];
+        if (data is List) {
+          materials = data;
+        } else if (data is Map) {
+          materials = [data];
+        }
+      }
+      _rawMaterials = materials;
       notifyListeners();
     }
   }

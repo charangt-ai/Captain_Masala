@@ -68,6 +68,43 @@ router.post('/batch', protect, async (req, res) => {
     
     await newBatch.save();
 
+    // Deduct Raw Material IMMEDIATELY upon batch creation
+    if (rawMaterials && rawMaterials.length > 0) {
+      for (const rm of rawMaterials) {
+        const rawMatDoc = await RawMaterial.findOne({ name: rm.name });
+        if (rawMatDoc) {
+          rawMatDoc.currentStock -= rm.quantity;
+          await rawMatDoc.save();
+          
+          const deductionLog = new InventoryLog({
+            productId: rawMatDoc._id.toString(),
+            productName: rm.name,
+            changeQuantity: -rm.quantity,
+            type: 'Manufacturing Raw Material Usage',
+            dateTime: new Date(),
+            notes: `Batch for ${targetProductName} created`,
+          });
+          await deductionLog.save();
+        }
+      }
+    } else if (rawMaterialName && rawMaterialQuantity) {
+      const rawMatDoc = await RawMaterial.findOne({ name: rawMaterialName });
+      if (rawMatDoc) {
+        rawMatDoc.currentStock -= rawMaterialQuantity;
+        await rawMatDoc.save();
+        
+        const deductionLog = new InventoryLog({
+          productId: rawMatDoc._id.toString(),
+          productName: rawMaterialName,
+          changeQuantity: -rawMaterialQuantity,
+          type: 'Manufacturing Raw Material Usage',
+          dateTime: new Date(),
+          notes: `Batch for ${targetProductName} created`,
+        });
+        await deductionLog.save();
+      }
+    }
+
     res.status(201).json({ success: true, batch: newBatch });
   } catch (error) {
     console.error('Error submitting manufacturing batch:', error);
@@ -119,22 +156,22 @@ router.delete('/batch/:id', protect, async (req, res) => {
         masterProduct.totalStockKg -= batch.finalOutputWeight;
         await masterProduct.save({ session });
       }
+    }
 
-      // Rollback Raw Materials
-      if (batch.rawMaterials && batch.rawMaterials.length > 0) {
-        for (const rm of batch.rawMaterials) {
-          const rawMatDoc = await RawMaterial.findOne({ name: rm.name }).session(session);
-          if (rawMatDoc) {
-            rawMatDoc.currentStock += rm.quantity; // Add back the consumed stock
-            await rawMatDoc.save({ session });
-          }
-        }
-      } else if (batch.rawMaterialName && batch.rawMaterialQuantity) {
-        const rawMatDoc = await RawMaterial.findOne({ name: batch.rawMaterialName }).session(session);
+    // ALWAYS Rollback Raw Materials since they are deducted on creation
+    if (batch.rawMaterials && batch.rawMaterials.length > 0) {
+      for (const rm of batch.rawMaterials) {
+        const rawMatDoc = await RawMaterial.findOne({ name: rm.name }).session(session);
         if (rawMatDoc) {
-          rawMatDoc.currentStock += batch.rawMaterialQuantity; // Add back the consumed stock
+          rawMatDoc.currentStock += rm.quantity; // Add back the consumed stock
           await rawMatDoc.save({ session });
         }
+      }
+    } else if (batch.rawMaterialName && batch.rawMaterialQuantity) {
+      const rawMatDoc = await RawMaterial.findOne({ name: batch.rawMaterialName }).session(session);
+      if (rawMatDoc) {
+        rawMatDoc.currentStock += batch.rawMaterialQuantity; // Add back the consumed stock
+        await rawMatDoc.save({ session });
       }
     }
 
@@ -177,39 +214,8 @@ router.post('/batch/:id/approve', protect, async (req, res) => {
     }
 
     // 1. Deduct Raw Material
-    if (batch.rawMaterials && batch.rawMaterials.length > 0) {
-      for (const rm of batch.rawMaterials) {
-        const rawMatDoc = await RawMaterial.findOne({ name: rm.name }).session(session);
-        if (rawMatDoc) {
-          rawMatDoc.currentStock -= rm.quantity;
-          await rawMatDoc.save({ session });
-        }
-        const deductionLog = new InventoryLog({
-          productId: rawMatDoc ? rawMatDoc._id.toString() : 'RAW_MATERIAL',
-          productName: rm.name,
-          changeQuantity: -rm.quantity,
-          type: 'Manufacturing Raw Material Usage',
-          dateTime: new Date(),
-          notes: `Batch for ${batch.targetProductName}`,
-        });
-        await deductionLog.save({ session });
-      }
-    } else if (batch.rawMaterialName && batch.rawMaterialQuantity) {
-      const rawMatDoc = await RawMaterial.findOne({ name: batch.rawMaterialName }).session(session);
-      if (rawMatDoc) {
-        rawMatDoc.currentStock -= batch.rawMaterialQuantity;
-        await rawMatDoc.save({ session });
-      }
-      const deductionLog = new InventoryLog({
-        productId: rawMatDoc ? rawMatDoc._id.toString() : 'RAW_MATERIAL',
-        productName: batch.rawMaterialName,
-        changeQuantity: -batch.rawMaterialQuantity,
-        type: 'Manufacturing Raw Material Usage',
-        dateTime: new Date(),
-        notes: `Batch for ${batch.targetProductName}`,
-      });
-      await deductionLog.save({ session });
-    }
+    // NOTE: Raw material is now deducted immediately upon batch creation (in POST /batch).
+    // No need to deduct it here again.
 
     // 2. Add Final Output to Master Stock
     masterProduct.totalStockKg += batch.finalOutputWeight;
