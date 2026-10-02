@@ -366,7 +366,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   }),
                 if (Permissions.isSuperAdmin(db.currentUserProfile?.role))
                   _buildActionButton(context, Icons.precision_manufacturing, 'Manufacture', () {
-                    Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ManufacturingScreen()));
+                    Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ManufacturingProcessScreen()));
                   }),
                 if (Permissions.isSuperAdmin(db.currentUserProfile?.role))
                   _buildActionButton(context, Icons.security, 'Manage Sellers', () {
