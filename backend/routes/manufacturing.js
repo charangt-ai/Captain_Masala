@@ -8,108 +8,14 @@ const InventoryLog = require('../models/InventoryLog');
 const Recipe = require('../models/Recipe');
 const RawMaterial = require('../models/RawMaterial');
 
-// @desc    Submit a new manufacturing batch (saved as PENDING APPROVAL)
+// @desc    Submit a new manufacturing batch (DEPRECATED)
 // @route   POST /api/manufacturing/batch
 // @access  Private
 router.post('/batch', protect, async (req, res) => {
-  try {
-    const {
-      targetProductId,
-      targetProductName,
-      createdById,
-      createdByName,
-      rawMaterialName,
-      rawMaterialQuantity,
-      rawMaterialAmount,
-      gstPercentage,
-      rawMaterials,
-      weightBeforeDrying,
-      weightAfterDrying,
-      dryingLoss,
-      weightBeforeGrinding,
-      weightAfterGrinding,
-      grindingLoss,
-      finalOutputWeight,
-      totalLoss,
-      yieldPercentage,
-      timestamp,
-      status
-    } = req.body;
-
-    // Validate Target Master Product exists
-    const masterProduct = await MasterProduct.findById(targetProductId);
-    if (!masterProduct) {
-      return res.status(404).json({ success: false, message: 'Target Master Product not found' });
-    }
-
-    // Create the Manufacturing Batch Record
-    const newBatch = new ManufacturingBatch({
-      targetProductId,
-      targetProductName,
-      createdById,
-      createdByName,
-      rawMaterialName,
-      rawMaterialQuantity,
-      rawMaterialAmount,
-      gstPercentage,
-      rawMaterials,
-      weightBeforeDrying,
-      weightAfterDrying,
-      dryingLoss,
-      weightBeforeGrinding,
-      weightAfterGrinding,
-      grindingLoss,
-      finalOutputWeight,
-      totalLoss,
-      yieldPercentage,
-      status: status || 'PENDING APPROVAL',
-      timestamp: timestamp ? new Date(timestamp) : Date.now()
-    });
-    
-    await newBatch.save();
-
-    // Deduct Raw Material IMMEDIATELY upon batch creation
-    if (rawMaterials && rawMaterials.length > 0) {
-      for (const rm of rawMaterials) {
-        const rawMatDoc = await RawMaterial.findOne({ name: rm.name });
-        if (rawMatDoc) {
-          rawMatDoc.currentStock -= rm.quantity;
-          await rawMatDoc.save();
-          
-          const deductionLog = new InventoryLog({
-            productId: rawMatDoc._id.toString(),
-            productName: rm.name,
-            changeQuantity: -rm.quantity,
-            type: 'Manufacturing Raw Material Usage',
-            dateTime: new Date(),
-            notes: `Batch for ${targetProductName} created`,
-          });
-          await deductionLog.save();
-        }
-      }
-    } else if (rawMaterialName && rawMaterialQuantity) {
-      const rawMatDoc = await RawMaterial.findOne({ name: rawMaterialName });
-      if (rawMatDoc) {
-        rawMatDoc.currentStock -= rawMaterialQuantity;
-        await rawMatDoc.save();
-        
-        const deductionLog = new InventoryLog({
-          productId: rawMatDoc._id.toString(),
-          productName: rawMaterialName,
-          changeQuantity: -rawMaterialQuantity,
-          type: 'Manufacturing Raw Material Usage',
-          dateTime: new Date(),
-          notes: `Batch for ${targetProductName} created`,
-        });
-        await deductionLog.save();
-      }
-    }
-
-    res.status(201).json({ success: true, batch: newBatch });
-  } catch (error) {
-    console.error('Error submitting manufacturing batch:', error);
-    res.status(500).json({ success: false, message: error.message || 'Server error' });
-  }
+  return res.status(400).json({ 
+    success: false, 
+    message: 'DEPRECATED: Please use the new Production Plan flow (/api/production-plans). Direct batch creation is no longer supported.'
+  });
 });
 
 // @desc    Get manufacturing batches by month and year

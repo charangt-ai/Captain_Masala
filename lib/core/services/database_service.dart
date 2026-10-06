@@ -10,6 +10,11 @@ import '../models/inventory_log.dart';
 import '../models/product_category.dart';
 import '../models/master_product.dart';
 import '../models/manufacturing_batch.dart';
+import '../models/production_plan.dart';
+import '../models/inventory/material_issue.dart';
+import '../models/quality_control.dart';
+import '../models/inventory/finished_goods_batch.dart';
+import '../models/batch_costing.dart';
 import 'api_config.dart';
 import 'offline_auth_service.dart';
 
@@ -857,6 +862,164 @@ class DatabaseService extends ChangeNotifier {
       return false;
     } catch (e) {
       debugPrint('Error approving manufacturing batch: $e');
+      return false;
+    }
+  }
+
+  // --- Production Planning ---
+  
+  Future<List<ProductionPlan>> fetchProductionPlans() async {
+    try {
+      final res = await http.get(
+        Uri.parse('${ApiConfig.baseUrl}/production-plans'),
+        headers: await _getHeaders(),
+      );
+      if (res.statusCode == 200) {
+        final decoded = json.decode(res.body);
+        final List data = decoded['data'] ?? [];
+        return data.map((json) => ProductionPlan.fromMap(json)).toList();
+      }
+      return [];
+    } catch (e) {
+      debugPrint('Error fetching production plans: $e');
+      return [];
+    }
+  }
+
+  Future<String?> createProductionPlan(Map<String, dynamic> planData) async {
+    try {
+      final res = await http.post(
+        Uri.parse('${ApiConfig.baseUrl}/production-plans'),
+        headers: await _getHeaders(),
+        body: json.encode(planData),
+      );
+      if (res.statusCode == 201 || res.statusCode == 200) {
+        return null; // Success
+      } else {
+        final body = json.decode(res.body);
+        return body['message'] ?? 'Failed with status ${res.statusCode}';
+      }
+    } catch (e) {
+      debugPrint('Error creating production plan: $e');
+      return 'Network error or server unreachable';
+    }
+  }
+
+  Future<bool> approveProductionPlan(String planId) async {
+    try {
+      final res = await http.post(
+        Uri.parse('${ApiConfig.baseUrl}/production-plans/$planId/approve'),
+        headers: await _getHeaders(),
+      );
+      return res.statusCode == 200;
+    } catch (e) {
+      debugPrint('Error approving plan: $e');
+      return false;
+    }
+  }
+
+  // --- Material Issue ---
+
+  Future<bool> issueMaterials(Map<String, dynamic> issueData) async {
+    try {
+      final res = await http.post(
+        Uri.parse('${ApiConfig.baseUrl}/material-issues'),
+        headers: await _getHeaders(),
+        body: json.encode(issueData),
+      );
+      return res.statusCode == 201 || res.statusCode == 200;
+    } catch (e) {
+      debugPrint('Error issuing materials: $e');
+      return false;
+    }
+  }
+
+  // --- Quality Control ---
+
+  Future<bool> submitQualityControl(Map<String, dynamic> qcData) async {
+    try {
+      final res = await http.post(
+        Uri.parse('${ApiConfig.baseUrl}/quality-control'),
+        headers: await _getHeaders(),
+        body: json.encode(qcData),
+      );
+      return res.statusCode == 201 || res.statusCode == 200;
+    } catch (e) {
+      debugPrint('Error submitting QC: $e');
+      return false;
+    }
+  }
+
+  // --- Finished Goods ---
+
+  Future<List<FinishedGoodsBatch>> fetchFinishedGoodsBatches() async {
+    try {
+      final res = await http.get(
+        Uri.parse('${ApiConfig.baseUrl}/finished-goods'),
+        headers: await _getHeaders(),
+      );
+      if (res.statusCode == 200) {
+        final decoded = json.decode(res.body);
+        final List data = decoded['data'] ?? [];
+        return data.map((json) => FinishedGoodsBatch.fromMap(json)).toList();
+      }
+      return [];
+    } catch (e) {
+      debugPrint('Error fetching finished goods batches: $e');
+      return [];
+    }
+  }
+
+  Future<bool> generateFinishedGoods(Map<String, dynamic> data) async {
+    try {
+      final res = await http.post(
+        Uri.parse('${ApiConfig.baseUrl}/finished-goods'),
+        headers: await _getHeaders(),
+        body: json.encode(data),
+      );
+      if (res.statusCode == 201 || res.statusCode == 200) {
+        await _fetchMasterProducts();
+        await _fetchLogs(reset: true);
+        notifyListeners();
+        return true;
+      }
+      return false;
+    } catch (e) {
+      debugPrint('Error generating finished goods: $e');
+      return false;
+    }
+  }
+
+  // --- Batch Costing ---
+
+  Future<List<BatchCosting>> fetchBatchCostings() async {
+    try {
+      final res = await http.get(
+        Uri.parse('${ApiConfig.baseUrl}/batch-costing'),
+        headers: await _getHeaders(),
+      );
+      if (res.statusCode == 200) {
+        final decoded = json.decode(res.body);
+        final List data = decoded['data'] ?? [];
+        return data.map((json) => BatchCosting.fromMap(json)).toList();
+      }
+      return [];
+    } catch (e) {
+      debugPrint('Error fetching batch costings: $e');
+      return [];
+    }
+  }
+
+  Future<bool> createBatchCosting(Map<String, dynamic> data) async {
+    try {
+      final res = await http.post(
+        Uri.parse('${ApiConfig.baseUrl}/batch-costing'),
+        headers: await _getHeaders(),
+        body: json.encode(data),
+      );
+      return res.statusCode == 201 || res.statusCode == 200;
+    } catch (e) {
+      debugPrint('Error creating batch costing: $e');
       return false;
     }
   }

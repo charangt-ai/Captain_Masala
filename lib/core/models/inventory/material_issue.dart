@@ -1,86 +1,95 @@
 import 'dart:convert';
 
-class IngredientIssueItem {
+class MaterialIssueItem {
   final String rawMaterialId;
-  final String batchNumber;
-  final double issueQuantity;
+  final String rawMaterialName;
+  final double requestedQuantity;
+  final double issuedQuantity;
+  final String unit;
+  final String? batchNumber;
 
-  IngredientIssueItem({
+  MaterialIssueItem({
     required this.rawMaterialId,
-    required this.batchNumber,
-    required this.issueQuantity,
+    required this.rawMaterialName,
+    required this.requestedQuantity,
+    required this.issuedQuantity,
+    required this.unit,
+    this.batchNumber,
   });
 
   Map<String, dynamic> toMap() {
     return {
       'rawMaterialId': rawMaterialId,
+      'rawMaterialName': rawMaterialName,
+      'requestedQuantity': requestedQuantity,
+      'issuedQuantity': issuedQuantity,
+      'unit': unit,
       'batchNumber': batchNumber,
-      'issueQuantity': issueQuantity,
     };
   }
 
-  factory IngredientIssueItem.fromMap(Map<String, dynamic> map) {
-    return IngredientIssueItem(
+  factory MaterialIssueItem.fromMap(Map<String, dynamic> map) {
+    return MaterialIssueItem(
       rawMaterialId: map['rawMaterialId'] ?? '',
-      batchNumber: map['batchNumber'] ?? '',
-      issueQuantity: map['issueQuantity']?.toDouble() ?? 0.0,
+      rawMaterialName: map['rawMaterialName'] ?? '',
+      requestedQuantity: (map['requestedQuantity'] as num?)?.toDouble() ?? 0.0,
+      issuedQuantity: (map['issuedQuantity'] as num?)?.toDouble() ?? 0.0,
+      unit: map['unit'] ?? 'kg',
+      batchNumber: map['batchNumber'],
     );
   }
 }
 
 class MaterialIssue {
-  final String id;
-  final String productId; // Target product or recipe
-  final List<IngredientIssueItem> ingredientsIssued;
-  final DateTime dateIssued;
-  final String issuedByUserId;
+  final String? id;
+  final String issueNumber;
+  final String productionPlanId;
+  final List<MaterialIssueItem> items;
+  final String status;
+  final String? issuedById;
+  final String? issuedByName;
+  final DateTime? issuedAt;
+  final String? notes;
 
   MaterialIssue({
-    required this.id,
-    required this.productId,
-    required this.ingredientsIssued,
-    required this.dateIssued,
-    required this.issuedByUserId,
+    this.id,
+    required this.issueNumber,
+    required this.productionPlanId,
+    required this.items,
+    this.status = 'PENDING',
+    this.issuedById,
+    this.issuedByName,
+    this.issuedAt,
+    this.notes,
   });
-
-  MaterialIssue copyWith({
-    String? id,
-    String? productId,
-    List<IngredientIssueItem>? ingredientsIssued,
-    DateTime? dateIssued,
-    String? issuedByUserId,
-  }) {
-    return MaterialIssue(
-      id: id ?? this.id,
-      productId: productId ?? this.productId,
-      ingredientsIssued: ingredientsIssued ?? this.ingredientsIssued,
-      dateIssued: dateIssued ?? this.dateIssued,
-      issuedByUserId: issuedByUserId ?? this.issuedByUserId,
-    );
-  }
 
   Map<String, dynamic> toMap() {
     return {
       'id': id,
-      'productId': productId,
-      'ingredientsIssued': ingredientsIssued.map((x) => x.toMap()).toList(),
-      'dateIssued': dateIssued.millisecondsSinceEpoch,
-      'issuedByUserId': issuedByUserId,
+      'issueNumber': issueNumber,
+      'productionPlanId': productionPlanId,
+      'items': items.map((x) => x.toMap()).toList(),
+      'status': status,
+      'issuedById': issuedById,
+      'issuedByName': issuedByName,
+      'issuedAt': issuedAt?.toIso8601String(),
+      'notes': notes,
     };
   }
 
   factory MaterialIssue.fromMap(Map<String, dynamic> map) {
     return MaterialIssue(
-      id: map['id'] ?? '',
-      productId: map['productId'] ?? '',
-      ingredientsIssued: List<IngredientIssueItem>.from(
-        (map['ingredientsIssued'] as List<dynamic>? ?? []).map((x) => IngredientIssueItem.fromMap(x)),
+      id: map['_id'] ?? map['id'],
+      issueNumber: map['issueNumber'] ?? '',
+      productionPlanId: map['productionPlanId'] ?? '',
+      items: List<MaterialIssueItem>.from(
+        (map['items'] as List<dynamic>? ?? []).map((x) => MaterialIssueItem.fromMap(x)),
       ),
-      dateIssued: DateTime.fromMillisecondsSinceEpoch(map['dateIssued']),
-      issuedByUserId: map['issuedByUserId'] ?? '',
+      status: map['status'] ?? 'PENDING',
+      issuedById: map['issuedById'],
+      issuedByName: map['issuedByName'],
+      issuedAt: map['issuedAt'] != null ? DateTime.tryParse(map['issuedAt'].toString()) : null,
+      notes: map['notes'],
     );
   }
-  
-  String toJson() => json.encode(toMap());
-  factory MaterialIssue.fromJson(String source) => MaterialIssue.fromMap(json.decode(source));
 }

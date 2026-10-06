@@ -28,6 +28,23 @@ const RawMaterialSchema = new mongoose.Schema({
   lastUpdated: {
     type: Date,
     default: Date.now
+  },
+  category: {
+    type: String,
+    enum: ['CORE_SPICE', 'COMMON_INGREDIENT', 'OIL_FAT', 'ADDITIVE', 'OTHER'],
+    default: 'CORE_SPICE'
+  },
+  minimumStockLevel: {
+    type: Number,
+    default: 0
+  },
+  costPerUnit: {
+    type: Number,
+    default: 0
+  },
+  expiryDays: {
+    type: Number,
+    default: 365
   }
 });
 

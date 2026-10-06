@@ -361,12 +361,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
             child: Row(
               children: [
                 if (Permissions.isSuperAdmin(db.currentUserProfile?.role))
-                  _buildActionButton(context, Icons.inventory, 'Raw Materials', () {
-                    Navigator.of(context).push(MaterialPageRoute(builder: (_) => const RawMaterialStockScreen()));
-                  }),
-                if (Permissions.isSuperAdmin(db.currentUserProfile?.role))
-                  _buildActionButton(context, Icons.precision_manufacturing, 'Manufacture', () {
-                    Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ManufacturingProcessScreen()));
+                  _buildActionButton(context, Icons.factory, 'Inventory & Production', () {
+                    Navigator.of(context).push(MaterialPageRoute(builder: (_) => const InventoryDashboardScreen()));
                   }),
                 if (Permissions.isSuperAdmin(db.currentUserProfile?.role))
                   _buildActionButton(context, Icons.security, 'Manage Sellers', () {

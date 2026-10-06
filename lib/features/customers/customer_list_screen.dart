@@ -132,9 +132,11 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
                           backgroundImage: c.shopImageUrl.isNotEmpty 
                               ? (c.shopImageUrl.startsWith('http') 
                                   ? NetworkImage(c.shopImageUrl) 
-                                  : FileImage(File(c.shopImageUrl))) as ImageProvider
+                                  : (File(c.shopImageUrl).existsSync() ? FileImage(File(c.shopImageUrl)) as ImageProvider : null))
                               : null,
-                          child: c.shopImageUrl.isEmpty ? const Icon(Icons.storefront, color: AppColors.primaryGreen) : null,
+                          child: (c.shopImageUrl.isEmpty || (!c.shopImageUrl.startsWith('http') && !File(c.shopImageUrl).existsSync())) 
+                              ? const Icon(Icons.storefront, color: AppColors.primaryGreen) 
+                              : null,
                         ),
                         title: Text(c.shopName, style: const TextStyle(fontWeight: FontWeight.bold)),
                         subtitle: Column(

@@ -1,5 +1,10 @@
 import 'package:flutter/material.dart';
 import 'raw_material_stock_screen.dart';
+import '../production/production_plan_list_screen.dart';
+import '../production/material_issue_screen.dart';
+import '../production/quality_control_screen.dart';
+import '../production/finished_goods_screen.dart';
+import '../production/batch_costing_screen.dart';
 
 class InventoryDashboardScreen extends StatelessWidget {
   const InventoryDashboardScreen({Key? key}) : super(key: key);
@@ -46,11 +51,11 @@ class InventoryDashboardScreen extends StatelessWidget {
           ),
           _buildDashboardCard(
             context,
-            'Stock Ledger',
-            Icons.inventory,
-            Colors.teal,
+            'Production Planning',
+            Icons.calendar_month,
+            Colors.purple,
             () {
-              // Navigate to Stock Ledger
+              Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ProductionPlanListScreen()));
             },
           ),
           _buildDashboardCard(
@@ -59,14 +64,41 @@ class InventoryDashboardScreen extends StatelessWidget {
             Icons.outbox,
             Colors.deepPurple,
             () {
-              // Navigate to Material Issue
+              Navigator.of(context).push(MaterialPageRoute(builder: (_) => const MaterialIssueScreen()));
+            },
+          ),
+          _buildDashboardCard(
+            context,
+            'Quality Control (QC)',
+            Icons.verified,
+            Colors.amber[800]!,
+            () {
+              Navigator.of(context).push(MaterialPageRoute(builder: (_) => const QualityControlScreen()));
+            },
+          ),
+          _buildDashboardCard(
+            context,
+            'Finished Goods (Batches)',
+            Icons.inventory_2,
+            Colors.indigo,
+            () {
+              Navigator.of(context).push(MaterialPageRoute(builder: (_) => const FinishedGoodsScreen()));
+            },
+          ),
+          _buildDashboardCard(
+            context,
+            'Batch Costing Engine',
+            Icons.request_quote,
+            Colors.brown[800]!,
+            () {
+              Navigator.of(context).push(MaterialPageRoute(builder: (_) => const BatchCostingScreen()));
             },
           ),
           _buildDashboardCard(
             context,
             'Manufacturing Yield',
             Icons.factory,
-            Colors.brown,
+            Colors.blueGrey,
             () {
               // Navigate to Manufacturing process
             },

@@ -27,6 +27,12 @@ const inventoryRoutes = require('./routes/inventory');
 const manufacturingRoutes = require('./routes/manufacturing');
 const rawMaterialRoutes = require('./routes/rawMaterials');
 const recipeRoutes = require('./routes/recipes');
+const productionPlanRoutes = require('./routes/productionPlans');
+const materialIssueRoutes = require('./routes/materialIssues');
+const qualityControlRoutes = require('./routes/qualityControl');
+const finishedGoodsRoutes = require('./routes/finishedGoods');
+const batchCostingRoutes = require('./routes/batchCosting');
+const { setupCronJobs } = require('./cron/scheduler');
 
 // Mount routers
 app.use('/api/auth', authRoutes);
@@ -40,6 +46,14 @@ app.use('/api/inventory-logs', inventoryRoutes);
 app.use('/api/manufacturing', manufacturingRoutes);
 app.use('/api/inventory/raw-materials', rawMaterialRoutes);
 app.use('/api/recipes', recipeRoutes);
+app.use('/api/production-plans', productionPlanRoutes);
+app.use('/api/material-issues', materialIssueRoutes);
+app.use('/api/quality-control', qualityControlRoutes);
+app.use('/api/finished-goods', finishedGoodsRoutes);
+app.use('/api/batch-costing', batchCostingRoutes);
+
+// Initialize Cron Jobs
+setupCronJobs();
 
 app.get('/', (req, res) => {
   res.send('Captain Masala API is running');

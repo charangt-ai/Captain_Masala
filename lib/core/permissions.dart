@@ -3,6 +3,7 @@ class Permissions {
   static bool isAdmin(String? role) => role == 'super_admin' || role == 'admin';
   
   static bool canManageInventory(String? role) => role == 'super_admin';
+  static bool canManageProduction(String? role) => role == 'super_admin';
   static bool canViewAllSales(String? role) => role == 'super_admin' || role == 'admin';
   static bool canViewReports(String? role) => role == 'super_admin' || role == 'admin';
   

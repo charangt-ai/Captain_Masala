@@ -53,6 +53,16 @@ const ManufacturingBatchSchema = new mongoose.Schema({
   yieldPercentage: Number,
   status: {
     type: String,
+    enum: [
+      'PENDING APPROVAL',
+      'IN_PRODUCTION',
+      'PRODUCTION_COMPLETE',
+      'QC_PENDING',
+      'QC_PASSED',
+      'QC_FAILED',
+      'INVENTORY ADDED',
+      'CANCELLED'
+    ],
     default: 'PENDING APPROVAL',
   },
   addedToInventory: {
@@ -62,6 +72,15 @@ const ManufacturingBatchSchema = new mongoose.Schema({
   timestamp: {
     type: Date,
     default: Date.now,
+  },
+  productionPlanId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'ProductionPlan'
+  },
+  batchNumber: String,
+  qcStatus: {
+    type: String,
+    default: 'PENDING'
   },
 });
 

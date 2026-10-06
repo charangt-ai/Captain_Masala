@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../core/models/inventory/raw_material.dart';
-import '../../core/providers/inventory_provider.dart';
+import '../../../core/models/inventory/raw_material.dart';
 import 'package:provider/provider.dart';
 
 class LoadStockDialog extends StatefulWidget {

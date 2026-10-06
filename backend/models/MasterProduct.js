@@ -10,6 +10,13 @@ const masterProductSchema = new mongoose.Schema({
     quantityPerUnit: { type: Number, required: true }, // kg required for 1 unit of final product
     unitCost: { type: Number, required: true, default: 0 },
   }],
+  minimumStockKg: { type: Number, default: 0 },
+  defaultShelfLifeDays: { type: Number, default: 180 },
+  qcParameters: [{
+    name: String,
+    expectedValue: String,
+    unit: String,
+  }],
 }, { timestamps: true });
 
 masterProductSchema.set('toJSON', {
