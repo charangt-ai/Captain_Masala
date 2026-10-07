@@ -295,13 +295,13 @@ class _ManufacturingProcessScreenState extends State<ManufacturingProcessScreen>
                     return;
                   }
                   
-                  // Check stock
-                  final rmDoc = db.rawMaterials.firstWhere((r) => r['name'] == item.name, orElse: () => null);
-                  if (rmDoc == null) {
+                  final rmDocs = db.rawMaterials.where((r) => r.name == item.name);
+                  if (rmDocs.isEmpty) {
                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${item.name} not found in inventory.')));
                      return;
                   }
-                  final double stock = (rmDoc['currentStock'] as num?)?.toDouble() ?? 0;
+                  final rmDoc = rmDocs.first;
+                  final double stock = rmDoc.currentStock;
                   if (item.quantity > stock) {
                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Not enough stock for ${item.name}. Available: $stock kg')));
                      return;
@@ -412,8 +412,8 @@ class _ManufacturingProcessScreenState extends State<ManufacturingProcessScreen>
                                 ),
                                 items: db.rawMaterials.map((rm) {
                                   return DropdownMenuItem<String>(
-                                    value: rm['name'],
-                                    child: Text('${rm['name']} (Stock: ${rm['currentStock']} ${rm['unit']})'),
+                                    value: rm.name,
+                                    child: Text('${rm.name} (Stock: ${rm.currentStock} ${rm.unit})'),
                                   );
                                 }).toList(),
                                 onChanged: (val) {
