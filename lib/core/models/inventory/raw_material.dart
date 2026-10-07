@@ -7,6 +7,7 @@ class RawMaterial {
   final String unit; // 'kg', 'g'
   final double? gst;
   final double minimumStockLevel;
+  final double currentStock;
   final bool isActive;
   final String? imageUrl;
 
@@ -17,6 +18,7 @@ class RawMaterial {
     required this.unit,
     this.gst,
     required this.minimumStockLevel,
+    this.currentStock = 0.0,
     this.isActive = true,
     this.imageUrl,
   });
@@ -28,6 +30,7 @@ class RawMaterial {
     String? unit,
     double? gst,
     double? minimumStockLevel,
+    double? currentStock,
     bool? isActive,
     String? imageUrl,
   }) {
@@ -38,6 +41,7 @@ class RawMaterial {
       unit: unit ?? this.unit,
       gst: gst ?? this.gst,
       minimumStockLevel: minimumStockLevel ?? this.minimumStockLevel,
+      currentStock: currentStock ?? this.currentStock,
       isActive: isActive ?? this.isActive,
       imageUrl: imageUrl ?? this.imageUrl,
     );
@@ -51,6 +55,7 @@ class RawMaterial {
       'unit': unit,
       'gst': gst,
       'minimumStockLevel': minimumStockLevel,
+      'currentStock': currentStock,
       'isActive': isActive,
       'imageUrl': imageUrl,
     };
@@ -58,12 +63,13 @@ class RawMaterial {
 
   factory RawMaterial.fromMap(Map<String, dynamic> map) {
     return RawMaterial(
-      id: map['id'] ?? '',
+      id: map['id'] ?? map['_id'] ?? '',
       name: map['name'] ?? '',
       category: map['category'] ?? '',
       unit: map['unit'] ?? '',
       gst: map['gst']?.toDouble(),
       minimumStockLevel: map['minimumStockLevel']?.toDouble() ?? 0.0,
+      currentStock: map['currentStock']?.toDouble() ?? 0.0,
       isActive: map['isActive'] ?? true,
       imageUrl: map['imageUrl'],
     );

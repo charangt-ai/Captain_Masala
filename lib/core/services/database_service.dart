@@ -15,6 +15,7 @@ import '../models/inventory/material_issue.dart';
 import '../models/quality_control.dart';
 import '../models/inventory/finished_goods_batch.dart';
 import '../models/batch_costing.dart';
+import '../models/inventory/raw_material.dart';
 import 'api_config.dart';
 import 'offline_auth_service.dart';
 
@@ -192,8 +193,8 @@ class DatabaseService extends ChangeNotifier {
     }
   }
 
-  List<dynamic> _rawMaterials = [];
-  List<dynamic> get rawMaterials => _rawMaterials;
+  List<RawMaterial> _rawMaterials = [];
+  List<RawMaterial> get rawMaterials => _rawMaterials;
 
   Future<void> _fetchMasterProducts() async {
     final res = await http.get(Uri.parse('${ApiConfig.baseUrl}/master-products'), headers: await _getHeaders());
@@ -233,7 +234,7 @@ class DatabaseService extends ChangeNotifier {
           materials = [data];
         }
       }
-      _rawMaterials = materials;
+      _rawMaterials = materials.map((m) => RawMaterial.fromMap(m)).toList();
       notifyListeners();
     }
   }
