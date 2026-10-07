@@ -45,6 +45,18 @@ const ManufacturingBatchSchema = new mongoose.Schema({
   weightBeforeGrinding: Number,
   weightAfterGrinding: Number,
   grindingLoss: Number,
+  dryingCost: {
+    type: Number,
+    default: 0,
+  },
+  grindingCost: {
+    type: Number,
+    default: 0,
+  },
+  otherCosts: [{
+    name: String,
+    amount: Number,
+  }],
   finalOutputWeight: {
     type: Number,
     required: true,

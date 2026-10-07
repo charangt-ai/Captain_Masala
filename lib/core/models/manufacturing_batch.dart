@@ -50,6 +50,10 @@ class ManufacturingBatch {
 
   List<RawMaterialItem> rawMaterials = [];
 
+  double dryingCost = 0.0;
+  double grindingCost = 0.0;
+  List<Map<String, dynamic>> otherCosts = [];
+
   double get totalGstAmount {
     if (rawMaterials.isNotEmpty) {
       return rawMaterials.fold(0.0, (sum, item) => sum + item.totalGstAmount);
@@ -58,10 +62,16 @@ class ManufacturingBatch {
   }
   
   double get totalCost {
+    double baseCost = 0.0;
     if (rawMaterials.isNotEmpty) {
-      return rawMaterials.fold(0.0, (sum, item) => sum + item.totalCost);
+      baseCost = rawMaterials.fold(0.0, (sum, item) => sum + item.totalCost);
+    } else {
+      baseCost = (rawMaterialAmount ?? 0) + totalGstAmount;
     }
-    return (rawMaterialAmount ?? 0) + totalGstAmount;
+    
+    double otherCostsTotal = otherCosts.fold(0.0, (sum, item) => sum + (item['amount'] as num? ?? 0.0).toDouble());
+    
+    return baseCost + dryingCost + grindingCost + otherCostsTotal;
   }
 
   double get totalRawMaterialQuantity {
@@ -107,6 +117,9 @@ class ManufacturingBatch {
       'weightBeforeGrinding': weightBeforeGrinding,
       'weightAfterGrinding': weightAfterGrinding,
       'grindingLoss': grindingLoss,
+      'dryingCost': dryingCost,
+      'grindingCost': grindingCost,
+      'otherCosts': otherCosts,
       'finalOutputWeight': finalOutputWeight,
       'totalLoss': totalLoss,
       'yieldPercentage': yieldPercentage,
@@ -134,6 +147,14 @@ class ManufacturingBatch {
     batch.weightAfterDrying = (map['weightAfterDrying'] as num?)?.toDouble();
     batch.weightBeforeGrinding = (map['weightBeforeGrinding'] as num?)?.toDouble();
     batch.weightAfterGrinding = (map['weightAfterGrinding'] as num?)?.toDouble();
+    
+    batch.dryingCost = (map['dryingCost'] as num?)?.toDouble() ?? 0.0;
+    batch.grindingCost = (map['grindingCost'] as num?)?.toDouble() ?? 0.0;
+    
+    if (map['otherCosts'] != null) {
+      batch.otherCosts = List<Map<String, dynamic>>.from(map['otherCosts']);
+    }
+
     batch.createdById = map['createdById'];
     batch.createdByName = map['createdByName'];
     

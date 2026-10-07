@@ -37,6 +37,16 @@ class RawMaterialControllers {
   }
 }
 
+class OtherCostControllers {
+  final TextEditingController name = TextEditingController();
+  final TextEditingController amount = TextEditingController();
+
+  void dispose() {
+    name.dispose();
+    amount.dispose();
+  }
+}
+
 class _ManufacturingProcessScreenState extends State<ManufacturingProcessScreen> {
   int _currentStep = 0;
   bool _isLoading = false;
@@ -52,6 +62,11 @@ class _ManufacturingProcessScreenState extends State<ManufacturingProcessScreen>
   // Controllers for Step 4
   final _beforeGrindingController = TextEditingController();
   final _afterGrindingController = TextEditingController();
+
+  // Controllers for Costs
+  final _dryingCostController = TextEditingController();
+  final _grindingCostController = TextEditingController();
+  final List<OtherCostControllers> _otherCostsList = [];
 
   @override
   void initState() {
@@ -82,6 +97,8 @@ class _ManufacturingProcessScreenState extends State<ManufacturingProcessScreen>
     _afterDryingController.addListener(_updateBatch);
     _beforeGrindingController.addListener(_updateBatch);
     _afterGrindingController.addListener(_updateBatch);
+    _dryingCostController.addListener(_updateBatch);
+    _grindingCostController.addListener(_updateBatch);
     for (var controllers in _rawMaterialsList) {
       controllers.amount.addListener(_updateBatchCost);
       controllers.gst.addListener(_updateBatchCost);
@@ -131,6 +148,19 @@ class _ManufacturingProcessScreenState extends State<ManufacturingProcessScreen>
       _batch.weightAfterDrying = double.tryParse(_afterDryingController.text);
       _batch.weightBeforeGrinding = double.tryParse(_beforeGrindingController.text);
       _batch.weightAfterGrinding = double.tryParse(_afterGrindingController.text);
+      
+      _batch.dryingCost = double.tryParse(_dryingCostController.text) ?? 0.0;
+      _batch.grindingCost = double.tryParse(_grindingCostController.text) ?? 0.0;
+      
+      _batch.otherCosts.clear();
+      for (var ctrl in _otherCostsList) {
+        if (ctrl.name.text.isNotEmpty && ctrl.amount.text.isNotEmpty) {
+          _batch.otherCosts.add({
+            'name': ctrl.name.text,
+            'amount': double.tryParse(ctrl.amount.text) ?? 0.0,
+          });
+        }
+      }
     });
   }
 
@@ -143,6 +173,11 @@ class _ManufacturingProcessScreenState extends State<ManufacturingProcessScreen>
     _afterDryingController.dispose();
     _beforeGrindingController.dispose();
     _afterGrindingController.dispose();
+    _dryingCostController.dispose();
+    _grindingCostController.dispose();
+    for (var ctrl in _otherCostsList) {
+      ctrl.dispose();
+    }
     super.dispose();
   }
 
@@ -190,6 +225,13 @@ class _ManufacturingProcessScreenState extends State<ManufacturingProcessScreen>
           _afterDryingController.clear();
           _beforeGrindingController.clear();
           _afterGrindingController.clear();
+          _dryingCostController.clear();
+          _grindingCostController.clear();
+          for (var ctrl in _otherCostsList) {
+            ctrl.dispose();
+          }
+          _otherCostsList.clear();
+          _batch.otherCosts.clear();
           _batch.targetProductId = null;
           _batch.targetProductName = null;
         });
@@ -535,6 +577,16 @@ class _ManufacturingProcessScreenState extends State<ManufacturingProcessScreen>
                         keyboardType: TextInputType.number,
                       ),
                       const SizedBox(height: 16),
+                      TextFormField(
+                        controller: _dryingCostController,
+                        decoration: const InputDecoration(
+                          labelText: 'Drying Process Cost (₹)', 
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.currency_rupee),
+                        ),
+                        keyboardType: TextInputType.number,
+                      ),
+                      const SizedBox(height: 16),
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
@@ -585,6 +637,16 @@ class _ManufacturingProcessScreenState extends State<ManufacturingProcessScreen>
                         keyboardType: TextInputType.number,
                       ),
                       const SizedBox(height: 16),
+                      TextFormField(
+                        controller: _grindingCostController,
+                        decoration: const InputDecoration(
+                          labelText: 'Grinding Process Cost (₹)', 
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.currency_rupee),
+                        ),
+                        keyboardType: TextInputType.number,
+                      ),
+                      const SizedBox(height: 16),
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
@@ -611,16 +673,94 @@ class _ManufacturingProcessScreenState extends State<ManufacturingProcessScreen>
               Step(
                 title: const Text('5. Complete Report', style: TextStyle(fontWeight: FontWeight.bold)),
                 isActive: _currentStep >= 4,
-                content: Card(
-                  color: Colors.purple.shade50,
-                  elevation: 4,
-                  shadowColor: Colors.purple.shade100,
-                  shape: RoundedRectangleBorder(
-                    side: BorderSide(color: Colors.purple.shade300, width: 1.5),
-                    borderRadius: BorderRadius.circular(12)
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(20.0),
+                content: Column(
+                  children: [
+                    // Other Costs Section
+                    Card(
+                      elevation: 2,
+                      margin: const EdgeInsets.only(bottom: 16),
+                      child: Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('Other Costs (Optional)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                            const SizedBox(height: 12),
+                            ..._otherCostsList.asMap().entries.map((entry) {
+                              int index = entry.key;
+                              OtherCostControllers controllers = entry.value;
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 8.0),
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      flex: 3,
+                                      child: TextFormField(
+                                        controller: controllers.name,
+                                        decoration: const InputDecoration(
+                                          labelText: 'Cost Name',
+                                          isDense: true,
+                                          border: OutlineInputBorder(),
+                                        ),
+                                        onChanged: (_) => _updateBatch(),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      flex: 2,
+                                      child: TextFormField(
+                                        controller: controllers.amount,
+                                        decoration: const InputDecoration(
+                                          labelText: 'Amount (₹)',
+                                          isDense: true,
+                                          border: OutlineInputBorder(),
+                                        ),
+                                        keyboardType: TextInputType.number,
+                                        onChanged: (_) => _updateBatch(),
+                                      ),
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(Icons.delete, color: Colors.red),
+                                      onPressed: () {
+                                        setState(() {
+                                          _otherCostsList[index].dispose();
+                                          _otherCostsList.removeAt(index);
+                                          _updateBatch();
+                                        });
+                                      },
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }).toList(),
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: TextButton.icon(
+                                onPressed: () {
+                                  setState(() {
+                                    _otherCostsList.add(OtherCostControllers());
+                                  });
+                                },
+                                icon: const Icon(Icons.add),
+                                label: const Text('Add Other Cost'),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                    // Report Card
+                    Card(
+                      color: Colors.purple.shade50,
+                      elevation: 4,
+                      shadowColor: Colors.purple.shade100,
+                      shape: RoundedRectangleBorder(
+                        side: BorderSide(color: Colors.purple.shade300, width: 1.5),
+                        borderRadius: BorderRadius.circular(12)
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(20.0),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
@@ -638,24 +778,23 @@ class _ManufacturingProcessScreenState extends State<ManufacturingProcessScreen>
                         _buildReportRow('Target Product', _batch.targetProductName ?? 'N/A', isBold: true),
                         const SizedBox(height: 12),
                         
-                        const Text('Financials & Input', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
+                        const Text('Financials & Cost Breakdown', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
                         const SizedBox(height: 8),
                         ..._batch.rawMaterials.map((item) {
                           return Padding(
-                            padding: const EdgeInsets.only(bottom: 8.0),
-                            child: Column(
-                              children: [
-                                _buildReportRow('Material', '${item.name} (${item.quantity} kg)'),
-                                if ((item.amount ?? 0) > 0)
-                                  _buildReportRow('Cost', '₹${item.amount?.toStringAsFixed(2)} (+${item.gstPercentage ?? 0}% GST)'),
-                              ],
-                            ),
+                            padding: const EdgeInsets.only(bottom: 4.0),
+                            child: _buildReportRow('Raw Mat: ${item.name}', '₹${item.totalCost.toStringAsFixed(2)}'),
                           );
                         }).toList(),
-                        if (_batch.totalCost > 0)
-                          const Divider(height: 16),
-                        if (_batch.totalCost > 0)
-                          _buildReportRow('Total Cost', '₹${_batch.totalCost.toStringAsFixed(2)}', isBold: true),
+                        if (_batch.dryingCost > 0)
+                          _buildReportRow('Drying Process Cost', '₹${_batch.dryingCost.toStringAsFixed(2)}'),
+                        if (_batch.grindingCost > 0)
+                          _buildReportRow('Grinding Process Cost', '₹${_batch.grindingCost.toStringAsFixed(2)}'),
+                        ..._batch.otherCosts.map((cost) {
+                          return _buildReportRow('Other: ${cost['name']}', '₹${(cost['amount'] as num).toStringAsFixed(2)}');
+                        }).toList(),
+                        const Divider(height: 16),
+                        _buildReportRow('Total Cost', '₹${_batch.totalCost.toStringAsFixed(2)}', isBold: true),
                         
                         const SizedBox(height: 16),
                         const Text('Processing Metrics', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
