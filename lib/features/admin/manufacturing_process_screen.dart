@@ -761,9 +761,9 @@ class _ManufacturingProcessScreenState extends State<ManufacturingProcessScreen>
                       ),
                       child: Padding(
                         padding: const EdgeInsets.all(20.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
                         Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
@@ -830,9 +830,11 @@ class _ManufacturingProcessScreenState extends State<ManufacturingProcessScreen>
                     ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
+        ],
+      ),
           if (_isLoading)
             Container(
               color: Colors.black26,

@@ -12,15 +12,50 @@ const RawMaterial = require('../models/RawMaterial');
 // @route   POST /api/manufacturing/batch
 // @access  Private
 router.post('/batch', protect, async (req, res) => {
+  const session = await ManufacturingBatch.startSession();
+  session.startTransaction();
+
   try {
     const batch = new ManufacturingBatch(req.body);
-    // Since materials are already issued via the production plan flow (or if not, we can adjust here),
-    // we'll just create the batch record to track yield.
-    await batch.save();
+
+    if (batch.rawMaterials && batch.rawMaterials.length > 0) {
+      for (const item of batch.rawMaterials) {
+        const rawMat = await RawMaterial.findOne({ name: item.name }).session(session);
+        
+        if (!rawMat) {
+          throw new Error(`Raw material not found: ${item.name}`);
+        }
+
+        if (rawMat.currentStock < item.quantity) {
+          throw new Error(`Insufficient stock for ${item.name}. Available: ${rawMat.currentStock}, Required: ${item.quantity}`);
+        }
+
+        rawMat.currentStock -= item.quantity;
+        await rawMat.save({ session });
+
+        const logEntry = new InventoryLog({
+          productId: rawMat._id.toString(),
+          productName: rawMat.name,
+          changeQuantity: -item.quantity,
+          type: 'Consumption',
+          notes: `Consumed in Manufacturing Batch for Target Product: ${batch.targetProductName}`,
+          dateTime: new Date(),
+        });
+        await logEntry.save({ session });
+      }
+    }
+
+    await batch.save({ session });
+    
+    await session.commitTransaction();
+    session.endSession();
+
     res.status(201).json({ success: true, data: batch });
   } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
     console.error('Error creating manufacturing batch:', error);
-    res.status(500).json({ success: false, message: 'Server error' });
+    res.status(500).json({ success: false, message: error.message || 'Server error' });
   }
 });
 
