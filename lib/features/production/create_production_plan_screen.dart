@@ -80,7 +80,7 @@ class _CreateProductionPlanScreenState extends State<CreateProductionPlanScreen>
     if (widget.editPlan == null) {
       errorMessage = await db.createProductionPlan(planData);
     } else {
-      errorMessage = await db.updateProductionPlan(widget.editPlan!.id, planData);
+      errorMessage = await db.updateProductionPlan(widget.editPlan!.id!, planData);
     }
     
     setState(() => _isLoading = false);

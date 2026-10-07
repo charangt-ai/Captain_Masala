@@ -148,7 +148,7 @@ class _ProductionPlanListScreenState extends State<ProductionPlanListScreen> {
                               ),
                               IconButton(
                                 icon: const Icon(Icons.delete, color: Colors.red, size: 20),
-                                onPressed: () => _deletePlan(plan.id),
+                                onPressed: () => _deletePlan(plan.id!),
                               ),
                             ],
                             Chip(
