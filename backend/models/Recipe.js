@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 
 const RecipeSchema = new mongoose.Schema({
   productId: {
-    type: mongoose.Schema.Types.ObjectId,
+    type: String,
     ref: 'MasterProduct',
     required: true,
   },
