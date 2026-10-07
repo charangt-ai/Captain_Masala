@@ -136,6 +136,12 @@ router.put('/:id', protect, superAdmin, async (req, res) => {
       return res.status(404).json({ success: false, message: 'Plan not found' });
     }
 
+    if (req.body.status) {
+      plan.status = req.body.status;
+      await plan.save();
+      return res.json({ success: true, data: plan });
+    }
+
     if (plan.status !== 'DRAFT') {
       return res.status(400).json({ success: false, message: 'Only DRAFT plans can be edited' });
     }

@@ -10,11 +10,13 @@ import 'batch_detail_screen.dart';
 class ManufacturingProcessScreen extends StatefulWidget {
   final String? initialTargetProductId;
   final List<dynamic>? prefilledIngredients;
+  final String? planId;
   
   const ManufacturingProcessScreen({
     Key? key, 
     this.initialTargetProductId,
     this.prefilledIngredients,
+    this.planId,
   }) : super(key: key);
 
   @override
@@ -166,6 +168,11 @@ class _ManufacturingProcessScreenState extends State<ManufacturingProcessScreen>
       setState(() => _isLoading = false);
       
       if (success) {
+        if (widget.planId != null) {
+          // Update the plan status to QC_PENDING so it disappears from the pending queue
+          await db.updateProductionPlan(widget.planId!, {'status': 'QC_PENDING'});
+        }
+
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Batch Process Saved. Awaiting Inventory Approval.'))
         );

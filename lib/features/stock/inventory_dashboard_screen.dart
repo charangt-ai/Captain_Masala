@@ -6,6 +6,7 @@ import '../production/quality_control_screen.dart';
 import '../production/finished_goods_screen.dart';
 import '../production/batch_costing_screen.dart';
 import '../production/recipe_product_selector_screen.dart';
+import '../admin/manufacturing_process_screen.dart';
 
 class InventoryDashboardScreen extends StatelessWidget {
   const InventoryDashboardScreen({Key? key}) : super(key: key);
@@ -110,7 +111,7 @@ class InventoryDashboardScreen extends StatelessWidget {
             Icons.factory,
             Colors.blueGrey,
             () {
-              // Navigate to Manufacturing process
+              Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ManufacturingProcessScreen()));
             },
           ),
         ],

@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../core/services/database_service.dart';
 import '../../core/models/production_plan.dart';
 import 'create_production_plan_screen.dart';
+import '../admin/manufacturing_process_screen.dart';
 
 class ProductionPlanListScreen extends StatefulWidget {
   const ProductionPlanListScreen({Key? key}) : super(key: key);
@@ -185,6 +186,25 @@ class _ProductionPlanListScreenState extends State<ProductionPlanListScreen> {
                                     onPressed: () => _approvePlan(plan),
                                     style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
                                     child: const Text('Approve Plan', style: TextStyle(color: Colors.white)),
+                                  ),
+                                ] else if (plan.status == 'MATERIALS_ISSUED') ...[
+                                  const SizedBox(height: 16),
+                                  ElevatedButton(
+                                    onPressed: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(builder: (_) => ManufacturingProcessScreen(
+                                          initialTargetProductId: plan.masterProductId,
+                                          prefilledIngredients: plan.plannedIngredients.map((i) => {
+                                            'rawMaterialName': i.rawMaterialName,
+                                            'requiredQty': i.requiredQuantity,
+                                          }).toList(),
+                                          planId: plan.id,
+                                        )),
+                                      );
+                                    },
+                                    style: ElevatedButton.styleFrom(backgroundColor: Colors.purple),
+                                    child: const Text('Start Manufacturing', style: TextStyle(color: Colors.white)),
                                   ),
                                 ] else if (plan.status == 'QC_PASSED') ...[
                                   const SizedBox(height: 16),
