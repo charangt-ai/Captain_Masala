@@ -87,6 +87,31 @@ class _ProductionPlanListScreenState extends State<ProductionPlanListScreen> {
     }
   }
 
+  Future<void> _deletePlan(String planId) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Plan'),
+        content: const Text('Are you sure you want to delete this production plan?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Delete', style: TextStyle(color: Colors.red))),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      final db = Provider.of<DatabaseService>(context, listen: false);
+      final error = await db.deleteProductionPlan(planId);
+      if (error == null) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Plan deleted successfully')));
+        _loadPlans();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $error')));
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -107,9 +132,30 @@ class _ProductionPlanListScreenState extends State<ProductionPlanListScreen> {
                       child: ExpansionTile(
                         title: Text(plan.planNumber, style: const TextStyle(fontWeight: FontWeight.bold)),
                         subtitle: Text('${plan.masterProductName} - ${plan.plannedBatchSize} kg'),
-                        trailing: Chip(
-                          label: Text(plan.status, style: const TextStyle(color: Colors.white, fontSize: 10)),
-                          backgroundColor: _getStatusColor(plan.status),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (plan.status == 'DRAFT') ...[
+                              IconButton(
+                                icon: const Icon(Icons.edit, color: Colors.blue, size: 20),
+                                onPressed: () async {
+                                  final result = await Navigator.push(
+                                    context,
+                                    MaterialPageRoute(builder: (_) => CreateProductionPlanScreen(editPlan: plan)),
+                                  );
+                                  if (result == true) _loadPlans();
+                                },
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.delete, color: Colors.red, size: 20),
+                                onPressed: () => _deletePlan(plan.id),
+                              ),
+                            ],
+                            Chip(
+                              label: Text(plan.status, style: const TextStyle(color: Colors.white, fontSize: 10)),
+                              backgroundColor: _getStatusColor(plan.status),
+                            ),
+                          ],
                         ),
                         children: [
                           Padding(

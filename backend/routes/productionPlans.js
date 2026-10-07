@@ -124,4 +124,78 @@ router.post('/:id/approve', protect, superAdmin, async (req, res) => {
   }
 });
 
+// @desc    Update a production plan
+// @route   PUT /api/production-plans/:id
+// @access  Private
+router.put('/:id', protect, superAdmin, async (req, res) => {
+  try {
+    const { plannedBatchSize, plannedDate, priority, notes } = req.body;
+    let plan = await ProductionPlan.findById(req.params.id);
+    
+    if (!plan) {
+      return res.status(404).json({ success: false, message: 'Plan not found' });
+    }
+
+    if (plan.status !== 'DRAFT') {
+      return res.status(400).json({ success: false, message: 'Only DRAFT plans can be edited' });
+    }
+
+    const recipe = await Recipe.findById(plan.recipeId).populate('ingredients.rawMaterialId');
+    if (!recipe) {
+      return res.status(404).json({ success: false, message: 'Recipe not found for this product' });
+    }
+
+    const plannedIngredients = [];
+    for (let ingredient of recipe.ingredients) {
+      const requiredQty = (ingredient.requiredQuantity / recipe.baseBatchSize) * plannedBatchSize;
+      const rawMaterial = ingredient.rawMaterialId;
+      
+      if (!rawMaterial) {
+        return res.status(400).json({ success: false, message: 'One of the ingredients in this recipe no longer exists.' });
+      }
+
+      const availableStock = rawMaterial.currentStock || 0;
+      plannedIngredients.push({
+        rawMaterialId: rawMaterial._id,
+        rawMaterialName: rawMaterial.name,
+        requiredQuantity: requiredQty,
+        availableStock: availableStock,
+        isSufficient: availableStock >= requiredQty
+      });
+    }
+
+    plan.plannedBatchSize = plannedBatchSize;
+    if (plannedDate !== undefined) plan.plannedDate = plannedDate;
+    if (priority !== undefined) plan.priority = priority;
+    if (notes !== undefined) plan.notes = notes;
+    plan.plannedIngredients = plannedIngredients;
+
+    await plan.save();
+    res.json({ success: true, data: plan });
+  } catch (error) {
+    console.error('Error updating production plan:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// @desc    Delete a production plan
+// @route   DELETE /api/production-plans/:id
+// @access  Private
+router.delete('/:id', protect, superAdmin, async (req, res) => {
+  try {
+    const plan = await ProductionPlan.findById(req.params.id);
+    if (!plan) return res.status(404).json({ success: false, message: 'Plan not found' });
+    
+    if (plan.status !== 'DRAFT') {
+      return res.status(400).json({ success: false, message: 'Only DRAFT plans can be deleted' });
+    }
+
+    await plan.deleteOne();
+    res.json({ success: true, message: 'Plan deleted' });
+  } catch (error) {
+    console.error('Error deleting production plan:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
 module.exports = router;

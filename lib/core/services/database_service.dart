@@ -906,6 +906,43 @@ class DatabaseService extends ChangeNotifier {
     }
   }
 
+  Future<String?> updateProductionPlan(String planId, Map<String, dynamic> updateData) async {
+    try {
+      final res = await http.put(
+        Uri.parse('${ApiConfig.baseUrl}/production-plans/$planId'),
+        headers: await _getHeaders(),
+        body: json.encode(updateData),
+      );
+      if (res.statusCode == 200) {
+        return null; // Success
+      } else {
+        final body = json.decode(res.body);
+        return body['message'] ?? 'Failed with status ${res.statusCode}';
+      }
+    } catch (e) {
+      debugPrint('Error updating production plan: $e');
+      return 'Network error or server unreachable';
+    }
+  }
+
+  Future<String?> deleteProductionPlan(String planId) async {
+    try {
+      final res = await http.delete(
+        Uri.parse('${ApiConfig.baseUrl}/production-plans/$planId'),
+        headers: await _getHeaders(),
+      );
+      if (res.statusCode == 200) {
+        return null; // Success
+      } else {
+        final body = json.decode(res.body);
+        return body['message'] ?? 'Failed with status ${res.statusCode}';
+      }
+    } catch (e) {
+      debugPrint('Error deleting production plan: $e');
+      return 'Network error or server unreachable';
+    }
+  }
+
   Future<bool> approveProductionPlan(String planId) async {
     try {
       final res = await http.post(

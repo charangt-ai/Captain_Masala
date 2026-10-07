@@ -3,8 +3,12 @@ import 'package:provider/provider.dart';
 import '../../core/services/database_service.dart';
 import '../../core/models/master_product.dart';
 
+import '../../core/models/production_plan.dart';
+
 class CreateProductionPlanScreen extends StatefulWidget {
-  const CreateProductionPlanScreen({Key? key}) : super(key: key);
+  final ProductionPlan? editPlan;
+
+  const CreateProductionPlanScreen({Key? key, this.editPlan}) : super(key: key);
 
   @override
   State<CreateProductionPlanScreen> createState() => _CreateProductionPlanScreenState();
@@ -18,6 +22,18 @@ class _CreateProductionPlanScreenState extends State<CreateProductionPlanScreen>
   String _priority = 'MEDIUM';
   DateTime _plannedDate = DateTime.now();
   bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.editPlan != null) {
+      _selectedProductId = widget.editPlan!.masterProductId;
+      _batchSizeController.text = widget.editPlan!.plannedBatchSize.toString();
+      _notesController.text = widget.editPlan!.notes ?? '';
+      _priority = widget.editPlan!.priority;
+      _plannedDate = widget.editPlan!.plannedDate;
+    }
+  }
 
   @override
   void dispose() {
@@ -60,12 +76,18 @@ class _CreateProductionPlanScreenState extends State<CreateProductionPlanScreen>
       'notes': _notesController.text,
     };
 
-    final errorMessage = await db.createProductionPlan(planData);
+    String? errorMessage;
+    if (widget.editPlan == null) {
+      errorMessage = await db.createProductionPlan(planData);
+    } else {
+      errorMessage = await db.updateProductionPlan(widget.editPlan!.id, planData);
+    }
+    
     setState(() => _isLoading = false);
 
     if (errorMessage == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Production Plan created successfully')),
+        SnackBar(content: Text(widget.editPlan == null ? 'Production Plan created successfully' : 'Production Plan updated successfully')),
       );
       Navigator.pop(context, true); // Return true to signal refresh
     } else {
@@ -82,7 +104,7 @@ class _CreateProductionPlanScreenState extends State<CreateProductionPlanScreen>
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Create Production Plan'),
+        title: Text(widget.editPlan == null ? 'Create Production Plan' : 'Edit Production Plan'),
         backgroundColor: Colors.red[800],
       ),
       body: _isLoading
@@ -177,9 +199,9 @@ class _CreateProductionPlanScreenState extends State<CreateProductionPlanScreen>
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.red[800],
                         ),
-                        child: const Text(
-                          'Create Plan',
-                          style: TextStyle(fontSize: 16, color: Colors.white),
+                        child: Text(
+                          widget.editPlan == null ? 'Create Plan' : 'Update Plan',
+                          style: const TextStyle(fontSize: 16, color: Colors.white),
                         ),
                       ),
                     ),
