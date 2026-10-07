@@ -8,14 +8,20 @@ const InventoryLog = require('../models/InventoryLog');
 const Recipe = require('../models/Recipe');
 const RawMaterial = require('../models/RawMaterial');
 
-// @desc    Submit a new manufacturing batch (DEPRECATED)
+// @desc    Submit a new manufacturing batch
 // @route   POST /api/manufacturing/batch
 // @access  Private
 router.post('/batch', protect, async (req, res) => {
-  return res.status(400).json({ 
-    success: false, 
-    message: 'DEPRECATED: Please use the new Production Plan flow (/api/production-plans). Direct batch creation is no longer supported.'
-  });
+  try {
+    const batch = new ManufacturingBatch(req.body);
+    // Since materials are already issued via the production plan flow (or if not, we can adjust here),
+    // we'll just create the batch record to track yield.
+    await batch.save();
+    res.status(201).json({ success: true, data: batch });
+  } catch (error) {
+    console.error('Error creating manufacturing batch:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
 });
 
 // @desc    Get manufacturing batches by month and year
