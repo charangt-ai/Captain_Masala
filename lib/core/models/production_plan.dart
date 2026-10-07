@@ -50,6 +50,9 @@ class ProductionPlan {
   final String? createdById;
   final String? createdByName;
   final String? notes;
+  final String? materialIssueId;
+  final String? manufacturingBatchId;
+  final String? qualityControlId;
 
   ProductionPlan({
     this.id,
@@ -65,6 +68,9 @@ class ProductionPlan {
     this.createdById,
     this.createdByName,
     this.notes,
+    this.materialIssueId,
+    this.manufacturingBatchId,
+    this.qualityControlId,
   });
 
   Map<String, dynamic> toMap() {
@@ -102,6 +108,9 @@ class ProductionPlan {
       createdById: map['createdById'],
       createdByName: map['createdByName'],
       notes: map['notes'],
+      materialIssueId: map['materialIssueId'],
+      manufacturingBatchId: map['manufacturingBatchId'],
+      qualityControlId: map['qualityControlId'],
     );
   }
 }

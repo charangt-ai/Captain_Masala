@@ -52,8 +52,8 @@ class _ProductionPlanListScreenState extends State<ProductionPlanListScreen> {
     // and manufacturing/expiry dates. For simplicity, we use the planned batch size and default dates.
     final data = {
       'productionPlanId': plan.id,
-      'qcId': plan.id, // Replace with actual qcId from plan if available
-      'manufacturingBatchId': plan.id, // Fallback
+      'qcId': plan.qualityControlId,
+      'manufacturingBatchId': plan.manufacturingBatchId,
       'initialQuantity': plan.plannedBatchSize,
       'manufacturingDate': DateTime.now().toIso8601String(),
       'expiryDate': DateTime.now().add(const Duration(days: 365)).toIso8601String(),

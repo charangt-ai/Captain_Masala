@@ -5,6 +5,7 @@ import '../production/material_issue_screen.dart';
 import '../production/quality_control_screen.dart';
 import '../production/finished_goods_screen.dart';
 import '../production/batch_costing_screen.dart';
+import '../production/recipe_product_selector_screen.dart';
 
 class InventoryDashboardScreen extends StatelessWidget {
   const InventoryDashboardScreen({Key? key}) : super(key: key);
@@ -47,6 +48,15 @@ class InventoryDashboardScreen extends StatelessWidget {
             Colors.green,
             () {
               // Navigate to Purchases
+            },
+          ),
+          _buildDashboardCard(
+            context,
+            'Master Recipes',
+            Icons.menu_book,
+            Colors.teal,
+            () {
+              Navigator.of(context).push(MaterialPageRoute(builder: (_) => const RecipeProductSelectorScreen()));
             },
           ),
           _buildDashboardCard(

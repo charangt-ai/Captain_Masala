@@ -31,11 +31,16 @@ router.post('/', protect, superAdmin, async (req, res) => {
     for (let ingredient of recipe.ingredients) {
       const requiredQty = (ingredient.requiredQuantity / recipe.baseBatchSize) * plannedBatchSize;
       const rawMaterial = ingredient.rawMaterialId;
-      const availableStock = rawMaterial ? rawMaterial.currentStock : 0;
+      
+      if (!rawMaterial) {
+        return res.status(400).json({ success: false, message: 'One of the ingredients in this recipe no longer exists in the raw materials database. Please update the recipe.' });
+      }
+
+      const availableStock = rawMaterial.currentStock || 0;
       
       plannedIngredients.push({
-        rawMaterialId: rawMaterial ? rawMaterial._id : null,
-        rawMaterialName: rawMaterial ? rawMaterial.name : 'Unknown',
+        rawMaterialId: rawMaterial._id,
+        rawMaterialName: rawMaterial.name,
         requiredQuantity: requiredQty,
         availableStock: availableStock,
         isSufficient: availableStock >= requiredQty

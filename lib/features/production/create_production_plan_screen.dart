@@ -12,7 +12,7 @@ class CreateProductionPlanScreen extends StatefulWidget {
 
 class _CreateProductionPlanScreenState extends State<CreateProductionPlanScreen> {
   final _formKey = GlobalKey<FormState>();
-  MasterProduct? _selectedProduct;
+  String? _selectedProductId;
   final TextEditingController _batchSizeController = TextEditingController();
   final TextEditingController _notesController = TextEditingController();
   String _priority = 'MEDIUM';
@@ -42,7 +42,7 @@ class _CreateProductionPlanScreenState extends State<CreateProductionPlanScreen>
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-    if (_selectedProduct == null) {
+    if (_selectedProductId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please select a Master Product')),
       );
@@ -53,7 +53,7 @@ class _CreateProductionPlanScreenState extends State<CreateProductionPlanScreen>
 
     final db = Provider.of<DatabaseService>(context, listen: false);
     final planData = {
-      'masterProductId': _selectedProduct!.id,
+      'masterProductId': _selectedProductId,
       'plannedBatchSize': double.parse(_batchSizeController.text),
       'plannedDate': _plannedDate.toIso8601String(),
       'priority': _priority,
@@ -94,21 +94,21 @@ class _CreateProductionPlanScreenState extends State<CreateProductionPlanScreen>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    DropdownButtonFormField<MasterProduct>(
+                    DropdownButtonFormField<String>(
                       decoration: const InputDecoration(
                         labelText: 'Select Master Product',
                         border: OutlineInputBorder(),
                       ),
-                      value: _selectedProduct,
+                      value: _selectedProductId,
                       items: masterProducts.map((p) {
-                        return DropdownMenuItem<MasterProduct>(
-                          value: p,
+                        return DropdownMenuItem<String>(
+                          value: p.id,
                           child: Text(p.name),
                         );
                       }).toList(),
                       onChanged: (val) {
                         setState(() {
-                          _selectedProduct = val;
+                          _selectedProductId = val;
                         });
                       },
                       validator: (val) => val == null ? 'Required' : null,

@@ -911,9 +911,46 @@ class DatabaseService extends ChangeNotifier {
         Uri.parse('${ApiConfig.baseUrl}/production-plans/$planId/approve'),
         headers: await _getHeaders(),
       );
+      if (res.statusCode != 200) {
+        debugPrint('Approve plan failed: ${res.body}');
+      }
       return res.statusCode == 200;
     } catch (e) {
       debugPrint('Error approving plan: $e');
+      return false;
+    }
+  }
+
+  Future<Map<String, dynamic>?> fetchRecipe(String productId) async {
+    try {
+      final res = await http.get(
+        Uri.parse('${ApiConfig.baseUrl}/recipes/$productId'),
+        headers: await _getHeaders(),
+      );
+      if (res.statusCode == 200) {
+        return json.decode(res.body)['data'];
+      }
+      debugPrint('Fetch recipe failed: ${res.body}');
+      return null;
+    } catch (e) {
+      debugPrint('Error fetching recipe: $e');
+      return null;
+    }
+  }
+
+  Future<bool> saveRecipe(Map<String, dynamic> recipeData) async {
+    try {
+      final res = await http.post(
+        Uri.parse('${ApiConfig.baseUrl}/recipes'),
+        headers: await _getHeaders(),
+        body: json.encode(recipeData),
+      );
+      if (res.statusCode != 201 && res.statusCode != 200) {
+        debugPrint('Save recipe failed: ${res.body}');
+      }
+      return res.statusCode == 201 || res.statusCode == 200;
+    } catch (e) {
+      debugPrint('Error saving recipe: $e');
       return false;
     }
   }
