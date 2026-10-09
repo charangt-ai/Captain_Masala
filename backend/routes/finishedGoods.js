@@ -174,7 +174,7 @@ router.post('/:id/allocate', protect, superAdmin, async (req, res) => {
       status: 'PENDING_STOCK_APPROVAL',
       allocations: allocationItems,
       totalAllocatedKg: totalAllocated,
-      preparedBy: req.user._id,
+      preparedBy: req.user.uid || req.user._id || 'admin',
     });
     
     await packagingAlloc.save();

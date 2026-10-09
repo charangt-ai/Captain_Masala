@@ -99,7 +99,7 @@ router.post('/', protect, superAdmin, async (req, res) => {
 
       // 4. Update statuses (Mark as COMPLETED directly since FG is generated)
       plan.status = 'COMPLETED';
-      batch.status = 'COMPLETED';
+      batch.status = 'QC_PASSED'; // Must be a valid enum in ManufacturingBatch schema
     } else if (overallResult === 'FAILED') {
       plan.status = 'QC_FAILED';
       batch.status = 'QC_FAILED';

@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import '../../core/services/database_service.dart';
 import '../../core/models/production_plan.dart';
 import '../../core/models/master_product.dart';
-
+import 'finished_goods_screen.dart';
 class QualityControlScreen extends StatefulWidget {
   const QualityControlScreen({Key? key}) : super(key: key);
 
@@ -112,10 +112,14 @@ class _QualityControlScreenState extends State<QualityControlScreen> {
 
     if (success) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Quality Control submitted successfully!')),
+        const SnackBar(content: Text('Quality Control submitted successfully! Navigating to allocation...')),
       );
       _selectedPlan = null;
       _loadPendingQCPlans();
+      // Navigate to Finished Goods to allocate packaging
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => const FinishedGoodsScreen()),
+      );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Failed to submit QC.')),

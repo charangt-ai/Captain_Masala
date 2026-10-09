@@ -9,15 +9,15 @@ const packagingAllocationSchema = new mongoose.Schema({
     default: 'PENDING_STOCK_APPROVAL' 
   },
   allocations: [{
-    productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },
+    productId: { type: String, ref: 'Product', required: true },
     packSize: { type: String, required: true },
     packSizeKg: { type: Number, required: true },
     allocatedKg: { type: Number, required: true },
     calculatedPacketCount: { type: Number, required: true },
   }],
   totalAllocatedKg: { type: Number, required: true },
-  preparedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  approvedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  preparedBy: { type: String, ref: 'User', required: true },
+  approvedBy: { type: String, ref: 'User' },
   rejectionReason: { type: String },
   approvedAt: { type: Date },
 }, { timestamps: true });
