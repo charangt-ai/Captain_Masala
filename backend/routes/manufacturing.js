@@ -7,6 +7,89 @@ const Product = require('../models/Product');
 const InventoryLog = require('../models/InventoryLog');
 const Recipe = require('../models/Recipe');
 const RawMaterial = require('../models/RawMaterial');
+const ProductionPlan = require('../models/ProductionPlan');
+
+// @desc    Get recipe for a production plan
+// @route   GET /api/manufacturing/plan-recipe/:planId
+// @access  Private
+router.get('/plan-recipe/:planId', protect, async (req, res) => {
+  try {
+    const plan = await ProductionPlan.findById(req.params.planId)
+      .populate('recipeId')
+      .lean();
+
+    if (!plan) {
+      return res.status(404).json({ success: false, message: 'Production plan not found' });
+    }
+
+    let recipe = plan.recipeId;
+
+    // Fallback 1: If recipe is not populated or is null, find by productId
+    if (!recipe || typeof recipe !== 'object') {
+      recipe = await Recipe.findOne({ productId: plan.masterProductId }).lean();
+    }
+
+    const ingredients = [];
+
+    if (recipe && recipe.ingredients && recipe.ingredients.length > 0) {
+      const scale = (recipe.baseBatchSize && recipe.baseBatchSize > 0)
+        ? (plan.plannedBatchSize / recipe.baseBatchSize)
+        : 1;
+
+      for (const item of recipe.ingredients) {
+        let rawMat = null;
+        if (item.rawMaterialId) {
+          rawMat = await RawMaterial.findById(item.rawMaterialId).lean();
+        }
+        if (rawMat) {
+          ingredients.push({
+            rawMaterialId: rawMat._id,
+            name: rawMat.name,
+            requiredQuantity: Number(((item.requiredQuantity || 0) * scale).toFixed(2)),
+            availableStock: rawMat.currentStock || 0,
+            unit: rawMat.unit || 'kg',
+            costPerUnit: rawMat.costPerUnit || 0,
+            gst: rawMat.gst || 0
+          });
+        }
+      }
+    }
+
+    // Fallback 2: If ingredients array is still empty, fallback to plan.plannedIngredients
+    if (ingredients.length === 0 && plan.plannedIngredients && plan.plannedIngredients.length > 0) {
+      for (const ing of plan.plannedIngredients) {
+        let rawMat = null;
+        if (ing.rawMaterialId) {
+          rawMat = await RawMaterial.findById(ing.rawMaterialId).lean();
+        }
+        ingredients.push({
+          rawMaterialId: ing.rawMaterialId || (rawMat ? rawMat._id : null),
+          name: ing.rawMaterialName || (rawMat ? rawMat.name : 'Raw Material'),
+          requiredQuantity: ing.requiredQuantity || 0,
+          availableStock: rawMat ? rawMat.currentStock : (ing.availableStock || 0),
+          unit: rawMat ? (rawMat.unit || 'kg') : 'kg',
+          costPerUnit: rawMat ? (rawMat.costPerUnit || 0) : 0,
+          gst: rawMat ? (rawMat.gst || 0) : 0
+        });
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      data: {
+        planNumber: plan.planNumber,
+        masterProductId: plan.masterProductId,
+        masterProductName: plan.masterProductName,
+        plannedBatchSize: plan.plannedBatchSize,
+        baseBatchSize: (recipe && recipe.baseBatchSize) ? recipe.baseBatchSize : plan.plannedBatchSize,
+        ingredients: ingredients
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching plan recipe:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
 
 // @desc    Submit a new manufacturing batch
 // @route   POST /api/manufacturing/batch
@@ -47,6 +130,15 @@ router.post('/batch', protect, async (req, res) => {
 
     await batch.save({ session });
     
+    if (batch.productionPlanId) {
+      const ProductionPlan = require('../models/ProductionPlan');
+      const plan = await ProductionPlan.findById(batch.productionPlanId).session(session);
+      if (plan) {
+        plan.manufacturingBatchId = batch._id;
+        await plan.save({ session });
+      }
+    }
+
     await session.commitTransaction();
     session.endSession();
 
@@ -158,6 +250,10 @@ router.post('/batch/:id/approve', protect, async (req, res) => {
     const masterProduct = await MasterProduct.findById(batch.targetProductId).session(session);
     if (!masterProduct) {
       throw new Error('Target Master Product not found');
+    }
+
+    if (batch.status !== 'QC_PASSED') {
+      throw new Error('Cannot add to inventory. Batch must pass Quality Control first.');
     }
 
     // 1. Deduct Raw Material

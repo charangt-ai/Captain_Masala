@@ -5,6 +5,9 @@ const { protect, superAdmin } = require('../middleware/auth');
 const QualityControl = require('../models/QualityControl');
 const ProductionPlan = require('../models/ProductionPlan');
 const ManufacturingBatch = require('../models/ManufacturingBatch');
+const FinishedGoodsBatch = require('../models/FinishedGoodsBatch');
+const MasterProduct = require('../models/MasterProduct');
+const InventoryLog = require('../models/InventoryLog');
 
 // @desc    Submit QC results for a batch
 // @route   POST /api/quality-control
@@ -28,7 +31,10 @@ router.post('/', protect, superAdmin, async (req, res) => {
     const plan = await ProductionPlan.findById(productionPlanId).session(session);
     if (!plan) throw new Error('Production plan not found');
 
-    const batch = await ManufacturingBatch.findById(manufacturingBatchId).session(session);
+    let batch = await ManufacturingBatch.findById(manufacturingBatchId).session(session);
+    if (!batch) {
+      batch = await ManufacturingBatch.findOne({ productionPlanId }).session(session);
+    }
     if (!batch) throw new Error('Manufacturing batch not found');
 
     const count = await QualityControl.countDocuments();
@@ -55,8 +61,45 @@ router.post('/', protect, superAdmin, async (req, res) => {
 
     // Update Plan and Batch Status
     if (overallResult === 'PASSED' || overallResult === 'CONDITIONAL_PASS') {
-      plan.status = 'QC_PASSED';
-      batch.status = 'QC_PASSED';
+      // 1. Auto-create Finished Goods Batch
+      const masterProduct = await MasterProduct.findById(plan.masterProductId).session(session);
+      if (!masterProduct) throw new Error('Master product not found');
+
+      const fgCount = await FinishedGoodsBatch.countDocuments();
+      const fgBatchNumber = `FG-CM-${new Date().getFullYear()}-${(fgCount + 1).toString().padStart(4, '0')}`;
+
+      const fgBatch = new FinishedGoodsBatch({
+        batchNumber: fgBatchNumber,
+        masterProductId: plan.masterProductId,
+        masterProductName: plan.masterProductName,
+        productionPlanId: plan._id,
+        manufacturingBatchId: batch._id,
+        qcId: qc._id,
+        initialQuantity: batch.finalOutputWeight,
+        currentQuantity: batch.finalOutputWeight,
+        manufacturingDate: new Date(),
+        expiryDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000) // 1 year expiry
+      });
+      await fgBatch.save({ session });
+
+      // 2. Update Master Product Stock
+      masterProduct.totalStockKg += batch.finalOutputWeight;
+      await masterProduct.save({ session });
+
+      // 3. Create Inventory Log
+      const log = new InventoryLog({
+        productId: masterProduct._id.toString(),
+        productName: masterProduct.name,
+        changeQuantity: batch.finalOutputWeight,
+        type: 'Production Output',
+        dateTime: new Date(),
+        notes: `Generated FG Batch ${fgBatchNumber} automatically from passed QC ${qc.qcNumber}`,
+      });
+      await log.save({ session });
+
+      // 4. Update statuses (Mark as COMPLETED directly since FG is generated)
+      plan.status = 'COMPLETED';
+      batch.status = 'COMPLETED';
     } else if (overallResult === 'FAILED') {
       plan.status = 'QC_FAILED';
       batch.status = 'QC_FAILED';

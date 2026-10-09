@@ -267,6 +267,25 @@ class BatchReportPdfGenerator {
                             : 'GST (${batch.gstPercentage}%)', 
                           currencyFormat.format(batch.totalGstAmount)
                         ),
+                        if (batch.dryingCost > 0) ...[
+                          pw.Divider(height: 0, color: dividerColor),
+                          _buildSummaryRow('Drying Process Cost', currencyFormat.format(batch.dryingCost)),
+                        ],
+                        if (batch.grindingCost > 0) ...[
+                          pw.Divider(height: 0, color: dividerColor),
+                          _buildSummaryRow('Grinding Process Cost', currencyFormat.format(batch.grindingCost)),
+                        ],
+                        if (batch.otherCosts.isNotEmpty)
+                          ...batch.otherCosts.map((cost) {
+                            final cName = cost['name']?.toString() ?? 'Other Cost';
+                            final cAmt = (cost['amount'] as num?)?.toDouble() ?? 0.0;
+                            return pw.Column(
+                              children: [
+                                pw.Divider(height: 0, color: dividerColor),
+                                _buildSummaryRow(cName, currencyFormat.format(cAmt)),
+                              ],
+                            );
+                          }),
                         
                         pw.Container(
                           width: double.infinity,

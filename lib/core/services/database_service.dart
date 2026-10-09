@@ -882,8 +882,25 @@ class DatabaseService extends ChangeNotifier {
       }
       return [];
     } catch (e) {
-      debugPrint('Error fetching production plans: $e');
       return [];
+    }
+  }
+
+  Future<Map<String, dynamic>?> fetchPlanRecipe(String planId) async {
+    try {
+      final res = await http.get(
+        Uri.parse('${ApiConfig.baseUrl}/manufacturing/plan-recipe/$planId'),
+        headers: await _getHeaders(),
+      );
+      if (res.statusCode == 200) {
+        final decoded = json.decode(res.body);
+        return decoded['data'];
+      }
+      debugPrint('Fetch plan recipe failed: ${res.body}');
+      return null;
+    } catch (e) {
+      debugPrint('Error fetching plan recipe: $e');
+      return null;
     }
   }
 

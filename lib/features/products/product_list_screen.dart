@@ -89,20 +89,7 @@ class ProductListScreen extends StatelessWidget {
                         },
                         validator: (val) => val == null ? 'Please select a category' : null,
                       ),
-                      if (!isEdit && parentMaster == null) ...[
-                        const SizedBox(height: 12),
-                        TextFormField(
-                          controller: stockController,
-                          decoration: const InputDecoration(labelText: 'Initial Opening Stock (kg)'),
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                          validator: (val) {
-                            if (val == null || double.tryParse(val) == null) {
-                              return 'Enter initial stock';
-                            }
-                            return null;
-                          },
-                        ),
-                      ],
+                      // Stock is managed by production/ledger, so no initial stock input
                     ],
                   ),
                 ),
@@ -144,7 +131,7 @@ class ProductListScreen extends StatelessWidget {
                         packSize: packSizeController.text.trim(),
                         wholesalePrice: double.parse(priceController.text),
                         originalPrice: originalPrice,
-                        remainingStock: parentMaster != null ? 0.0 : double.parse(stockController.text),
+                        remainingStock: 0.0, // Stock is driven by production/ledger
                         masterProductId: masterId,
                         categoryId: selectedCategory?.id ?? '',
                       );
@@ -220,7 +207,6 @@ class ProductListScreen extends StatelessWidget {
                           onTap: () {
                             Navigator.pop(ctx);
                             final nameController = TextEditingController(text: m.name);
-                            final stockController = TextEditingController(text: m.totalStockKg.toString());
                             showDialog(
                               context: context,
                               builder: (dialogCtx) => AlertDialog(
@@ -233,11 +219,8 @@ class ProductListScreen extends StatelessWidget {
                                       decoration: const InputDecoration(labelText: 'Name'),
                                     ),
                                     const SizedBox(height: 12),
-                                    TextField(
-                                      controller: stockController,
-                                      decoration: const InputDecoration(labelText: 'Total Stock (kg)'),
-                                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                    ),
+                                    const Text('Stock must be adjusted via Inventory Logs or Production.', 
+                                      style: TextStyle(fontSize: 12, color: Colors.grey, fontStyle: FontStyle.italic)),
                                   ],
                                 ),
                                 actions: [
@@ -248,7 +231,7 @@ class ProductListScreen extends StatelessWidget {
                                         final updated = MasterProduct(
                                           id: m.id,
                                           name: nameController.text.trim(),
-                                          totalStockKg: double.tryParse(stockController.text) ?? m.totalStockKg,
+                                          totalStockKg: m.totalStockKg, // Preserve ledger value
                                         );
                                         db.updateMasterProduct(updated);
                                         Navigator.pop(dialogCtx);

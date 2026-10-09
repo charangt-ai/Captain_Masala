@@ -98,7 +98,7 @@ class _QualityControlScreenState extends State<QualityControlScreen> {
     // In a full implementation, you'd select the manufacturing batch associated with the plan.
     final qcData = {
       'productionPlanId': _selectedPlan!.id,
-      'manufacturingBatchId': _selectedPlan!.id, // Fallback mapping for now
+      'manufacturingBatchId': _selectedPlan!.manufacturingBatchId ?? _selectedPlan!.id, // Fallback mapping for now
       'parameters': parameters,
       'overallResult': _overallResult,
       'batchWeight': double.tryParse(_batchWeightController.text) ?? 0.0,

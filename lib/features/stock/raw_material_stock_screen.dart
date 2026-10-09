@@ -5,6 +5,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../../core/services/api_config.dart';
 import '../../core/theme.dart';
 import 'raw_material_entry_screen.dart';
+import 'raw_material_history_screen.dart';
 
 class RawMaterialStockScreen extends StatefulWidget {
   const RawMaterialStockScreen({Key? key}) : super(key: key);
@@ -130,6 +131,17 @@ class _RawMaterialStockScreenState extends State<RawMaterialStockScreen> {
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: ListTile(
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => RawMaterialHistoryScreen(
+                                      materialId: item['_id'],
+                                      materialName: name,
+                                    ),
+                                  ),
+                                );
+                              },
                               leading: CircleAvatar(
                                 backgroundColor: isLowStock ? Colors.red.shade100 : Colors.green.shade100,
                                 child: Icon(
@@ -142,23 +154,72 @@ class _RawMaterialStockScreenState extends State<RawMaterialStockScreen> {
                                 style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                               ),
                               subtitle: Text('Unit: $unit'),
-                              trailing: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                crossAxisAlignment: CrossAxisAlignment.end,
+                              trailing: Row(
+                                mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Text(
-                                    '${stock.toStringAsFixed(1)} $unit left',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 14,
-                                      color: isLowStock ? AppColors.outOfStockAlert : Colors.black87,
-                                    ),
+                                  Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    crossAxisAlignment: CrossAxisAlignment.end,
+                                    children: [
+                                      Text(
+                                        '${stock.toStringAsFixed(1)} $unit left',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 14,
+                                          color: isLowStock ? AppColors.outOfStockAlert : Colors.black87,
+                                        ),
+                                      ),
+                                      if (isLowStock)
+                                        const Text(
+                                          'Low Stock',
+                                          style: TextStyle(color: AppColors.outOfStockAlert, fontSize: 10),
+                                        )
+                                    ],
                                   ),
-                                  if (isLowStock)
-                                    const Text(
-                                      'Low Stock',
-                                      style: TextStyle(color: AppColors.outOfStockAlert, fontSize: 10),
-                                    )
+                                  PopupMenuButton<String>(
+                                    onSelected: (value) async {
+                                      if (value == 'edit') {
+                                        await Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (_) => RawMaterialEntryScreen(initialData: item),
+                                          ),
+                                        );
+                                        _fetchInventory();
+                                      } else if (value == 'delete') {
+                                        final confirm = await showDialog<bool>(
+                                          context: context,
+                                          builder: (ctx) => AlertDialog(
+                                            title: const Text('Delete Material'),
+                                            content: Text('Are you sure you want to delete $name?'),
+                                            actions: [
+                                              TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+                                              ElevatedButton(
+                                                onPressed: () => Navigator.pop(ctx, true),
+                                                style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryRed),
+                                                child: const Text('Delete'),
+                                              ),
+                                            ],
+                                          ),
+                                        );
+                                        if (confirm == true) {
+                                          final storage = const FlutterSecureStorage();
+                                          final token = await storage.read(key: 'jwt_token');
+                                          await http.delete(
+                                            Uri.parse('${ApiConfig.baseUrl}/inventory/raw-materials/${item['_id']}'),
+                                            headers: {
+                                              if (token != null) 'Authorization': 'Bearer $token',
+                                            },
+                                          );
+                                          _fetchInventory();
+                                        }
+                                      }
+                                    },
+                                    itemBuilder: (BuildContext context) => [
+                                      const PopupMenuItem(value: 'edit', child: Text('Edit')),
+                                      const PopupMenuItem(value: 'delete', child: Text('Delete')),
+                                    ],
+                                  ),
                                 ],
                               ),
                             ),

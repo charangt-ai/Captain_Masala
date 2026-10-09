@@ -10,6 +10,9 @@ const ManufacturingBatchSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
+  planNumber: {
+    type: String,
+  },
   createdById: {
     type: String,
     ref: 'User',

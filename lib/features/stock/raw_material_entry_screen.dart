@@ -5,7 +5,8 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../../core/services/api_config.dart';
 
 class RawMaterialEntryScreen extends StatefulWidget {
-  const RawMaterialEntryScreen({Key? key}) : super(key: key);
+  final Map<String, dynamic>? initialData;
+  const RawMaterialEntryScreen({Key? key, this.initialData}) : super(key: key);
 
   @override
   _RawMaterialEntryScreenState createState() => _RawMaterialEntryScreenState();
@@ -23,6 +24,18 @@ class _RawMaterialEntryScreenState extends State<RawMaterialEntryScreen> {
 
   final List<String> _units = ['kg', 'g', 'liters', 'pieces'];
 
+  @override
+  void initState() {
+    super.initState();
+    if (widget.initialData != null) {
+      _nameController.text = widget.initialData!['name'] ?? '';
+      _stockController.text = (widget.initialData!['currentStock']?.toString() ?? '0');
+      _gstController.text = (widget.initialData!['gst']?.toString() ?? '0');
+      _supplierController.text = widget.initialData!['supplierName'] ?? '';
+      _selectedUnit = widget.initialData!['unit'] ?? 'kg';
+    }
+  }
+
   Future<void> _submitStock() async {
     if (!_formKey.currentState!.validate()) return;
     
@@ -34,29 +47,55 @@ class _RawMaterialEntryScreenState extends State<RawMaterialEntryScreen> {
       final storage = const FlutterSecureStorage();
       final token = await storage.read(key: 'jwt_token');
 
-      final response = await http.post(
-        Uri.parse('${ApiConfig.baseUrl}/inventory/raw-materials'),
-        headers: {
-          'Content-Type': 'application/json',
-          if (token != null) 'Authorization': 'Bearer $token',
-        },
-        body: json.encode({
-          'name': _nameController.text.trim(),
-          'currentStock': double.parse(_stockController.text),
-          'unit': _selectedUnit,
-          'gst': _gstController.text.isNotEmpty ? double.parse(_gstController.text) : 0,
-          'supplierName': _supplierController.text.trim(),
-        }),
-      );
+      final isEdit = widget.initialData != null;
+      final url = isEdit 
+          ? '${ApiConfig.baseUrl}/inventory/raw-materials/${widget.initialData!['_id']}'
+          : '${ApiConfig.baseUrl}/inventory/raw-materials';
 
-      if (response.statusCode == 201) {
+      final request = isEdit 
+          ? http.put(
+              Uri.parse(url),
+              headers: {
+                'Content-Type': 'application/json',
+                if (token != null) 'Authorization': 'Bearer $token',
+              },
+              body: json.encode({
+                'name': _nameController.text.trim(),
+                'currentStock': double.parse(_stockController.text),
+                'unit': _selectedUnit,
+                'gst': _gstController.text.isNotEmpty ? double.parse(_gstController.text) : 0,
+                'supplierName': _supplierController.text.trim(),
+              }),
+            )
+          : http.post(
+              Uri.parse(url),
+              headers: {
+                'Content-Type': 'application/json',
+                if (token != null) 'Authorization': 'Bearer $token',
+              },
+              body: json.encode({
+                'name': _nameController.text.trim(),
+                'currentStock': double.parse(_stockController.text),
+                'unit': _selectedUnit,
+                'gst': _gstController.text.isNotEmpty ? double.parse(_gstController.text) : 0,
+                'supplierName': _supplierController.text.trim(),
+              }),
+            );
+
+      final response = await request;
+
+      if (response.statusCode == 201 || response.statusCode == 200) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Raw Material stock saved successfully!')),
+          SnackBar(content: Text(isEdit ? 'Raw Material updated successfully!' : 'Raw Material stock saved successfully!')),
         );
-        _formKey.currentState!.reset();
-        setState(() {
-          _selectedUnit = 'kg';
-        });
+        if (isEdit) {
+          Navigator.pop(context);
+        } else {
+          _formKey.currentState!.reset();
+          setState(() {
+            _selectedUnit = 'kg';
+          });
+        }
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Failed to save stock: ${response.body}')),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/services/database_service.dart';
 import '../../core/models/inventory/finished_goods_batch.dart';
+import 'packaging_allocation_screen.dart';
 
 class FinishedGoodsScreen extends StatefulWidget {
   const FinishedGoodsScreen({Key? key}) : super(key: key);
@@ -58,6 +59,17 @@ class _FinishedGoodsScreenState extends State<FinishedGoodsScreen> {
                     return Card(
                       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                       child: ListTile(
+                        onTap: batch.status == 'ACTIVE' ? () async {
+                          final shouldRefresh = await Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => PackagingAllocationScreen(batch: batch),
+                            ),
+                          );
+                          if (shouldRefresh == true) {
+                            _loadBatches();
+                          }
+                        } : null,
                         title: Text('${batch.masterProductName} - ${batch.batchNumber}', style: const TextStyle(fontWeight: FontWeight.bold)),
                         subtitle: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,

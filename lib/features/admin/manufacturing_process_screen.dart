@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../../core/models/manufacturing_batch.dart';
+import '../../core/models/production_plan.dart';
 import '../../core/services/database_service.dart';
 import '../../core/theme.dart';
 import '../../core/permissions.dart';
@@ -69,11 +70,18 @@ class _ManufacturingProcessScreenState extends State<ManufacturingProcessScreen>
   final List<OtherCostControllers> _otherCostsList = [];
 
   @override
+  List<ProductionPlan> _approvedPlans = [];
+  bool _isLoadingPlans = false;
+  
   void initState() {
     super.initState();
+    _fetchApprovedPlans();
     
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Provider.of<DatabaseService>(context, listen: false).fetchRawMaterials();
+      if (widget.planId != null) {
+        _onPlanSelected(widget.planId!);
+      }
     });
     
     // Pre-fill from previous validation screen if available
@@ -105,6 +113,60 @@ class _ManufacturingProcessScreenState extends State<ManufacturingProcessScreen>
       controllers.qty.addListener(_updateBatchCost);
       controllers.name.addListener(_updateBatchCost);
     }
+  }
+
+
+  Future<void> _fetchApprovedPlans() async {
+    setState(() => _isLoadingPlans = true);
+    final db = Provider.of<DatabaseService>(context, listen: false);
+    final plans = await db.fetchProductionPlans();
+    setState(() {
+      _approvedPlans = plans.where((p) => p.status == 'APPROVED' || p.status == 'MATERIALS_ISSUED').toList();
+      _isLoadingPlans = false;
+    });
+  }
+
+  Future<void> _onPlanSelected(String planId) async {
+    setState(() => _isLoading = true);
+    final db = Provider.of<DatabaseService>(context, listen: false);
+    final recipeData = await db.fetchPlanRecipe(planId);
+    
+    if (recipeData != null) {
+      setState(() {
+        _batch.targetProductId = recipeData['masterProductId'];
+        _batch.targetProductName = recipeData['masterProductName'];
+        _batch.planNumber = recipeData['planNumber'];
+        _batch.productionPlanId = planId;
+        
+        // Clear existing and add from recipe
+        for (var c in _rawMaterialsList) { c.dispose(); }
+        _rawMaterialsList.clear();
+        
+        for (var ing in recipeData['ingredients']) {
+          final c = RawMaterialControllers();
+          c.name.text = ing['name'];
+          c.qty.text = ing['requiredQuantity'].toString();
+          c.amount.text = (ing['requiredQuantity'] * ing['costPerUnit']).toStringAsFixed(2);
+          c.gst.text = ing['gst'].toString();
+          
+          c.amount.addListener(_updateBatchCost);
+          c.gst.addListener(_updateBatchCost);
+          c.qty.addListener(_updateBatchCost);
+          c.name.addListener(_updateBatchCost);
+          
+          _rawMaterialsList.add(c);
+        }
+        
+        if (_rawMaterialsList.isEmpty) {
+          _addIngredientForm();
+        }
+        
+        _updateBatchCost();
+      });
+    } else {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to load recipe')));
+    }
+    setState(() => _isLoading = false);
   }
 
   void _addIngredientForm() {
@@ -203,9 +265,9 @@ class _ManufacturingProcessScreenState extends State<ManufacturingProcessScreen>
       setState(() => _isLoading = false);
       
       if (success) {
-        if (widget.planId != null) {
+        if (_batch.productionPlanId != null) {
           // Update the plan status to QC_PENDING so it disappears from the pending queue
-          await db.updateProductionPlan(widget.planId!, {'status': 'QC_PENDING'});
+          await db.updateProductionPlan(_batch.productionPlanId!, {'status': 'QC_PENDING'});
         }
 
         ScaffoldMessenger.of(context).showSnackBar(
@@ -234,6 +296,8 @@ class _ManufacturingProcessScreenState extends State<ManufacturingProcessScreen>
           _batch.otherCosts.clear();
           _batch.targetProductId = null;
           _batch.targetProductName = null;
+          _batch.planNumber = null;
+          _batch.productionPlanId = null;
         });
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -292,7 +356,7 @@ class _ManufacturingProcessScreenState extends State<ManufacturingProcessScreen>
             type: StepperType.vertical,
             currentStep: _currentStep,
             controlsBuilder: (context, details) {
-              final isLastStep = _currentStep == 4;
+              final isLastStep = _currentStep == 5;
               return Padding(
                 padding: const EdgeInsets.only(top: 16.0),
                 child: Row(
@@ -328,8 +392,8 @@ class _ManufacturingProcessScreenState extends State<ManufacturingProcessScreen>
             },
             onStepContinue: () {
               if (_currentStep == 0) {
-                 if (_batch.targetProductId == null) {
-                   ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Select a product to make')));
+                 if (_batch.planNumber == null || _batch.targetProductId == null) {
+                   ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Select a production plan')));
                    return;
                  }
               }
@@ -380,7 +444,7 @@ class _ManufacturingProcessScreenState extends State<ManufacturingProcessScreen>
                  }
               }
 
-              if (_currentStep < 4) {
+              if (_currentStep < 5) {
                 setState(() {
                   _currentStep += 1;
                 });
@@ -396,38 +460,47 @@ class _ManufacturingProcessScreenState extends State<ManufacturingProcessScreen>
               }
             },
             steps: [
-              // Step 1: Choose Product
+              // Step 1: Choose Production Plan
               Step(
-                title: const Text('1. Choose Product', style: TextStyle(fontWeight: FontWeight.bold)),
+                title: const Text('1. Choose Production Plan', style: TextStyle(fontWeight: FontWeight.bold)),
                 isActive: _currentStep >= 0,
                 state: _currentStep > 0 ? StepState.complete : StepState.indexed,
                 content: _buildStepCard(
-                  child: DropdownButtonFormField<String>(
-                    value: _batch.targetProductId,
-                    decoration: const InputDecoration(
-                      labelText: 'Target Product', 
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.inventory_2_outlined),
-                    ),
-                    items: db.masterProducts.map((p) {
-                      return DropdownMenuItem(
-                        value: p.id,
-                        child: Text(p.name),
-                      );
-                    }).toList(),
-                    onChanged: (val) {
-                      setState(() {
-                        _batch.targetProductId = val;
-                        _batch.targetProductName = db.masterProducts.firstWhere((p) => p.id == val).name;
-                      });
-                    },
-                  ),
+                  child: _isLoadingPlans 
+                    ? const Center(child: CircularProgressIndicator())
+                    : _approvedPlans.isEmpty 
+                      ? const Padding(
+                          padding: EdgeInsets.all(16.0),
+                          child: Text('No approved production plans available. Please create and approve a plan first.', 
+                            style: TextStyle(color: Colors.red)),
+                        )
+                      : DropdownButtonFormField<String>(
+                          value: _approvedPlans.any((p) => p.id == _batch.productionPlanId || p.planNumber == _batch.planNumber) 
+                              ? _approvedPlans.firstWhere((p) => p.id == _batch.productionPlanId || p.planNumber == _batch.planNumber).id 
+                              : null,
+                          decoration: const InputDecoration(
+                            labelText: 'Select Production Plan', 
+                            border: OutlineInputBorder(),
+                            prefixIcon: Icon(Icons.assignment),
+                          ),
+                          items: _approvedPlans.map((p) {
+                            return DropdownMenuItem(
+                              value: p.id, // Using p.id as value
+                              child: Text('${p.planNumber} - ${p.masterProductName}'),
+                            );
+                          }).toList(),
+                          onChanged: (val) {
+                            if (val != null) {
+                               _onPlanSelected(val);
+                            }
+                          },
+                        ),
                 ),
               ),
 
               // Step 2: Enter Raw Material
               Step(
-                title: const Text('2. Enter Raw Material', style: TextStyle(fontWeight: FontWeight.bold)),
+                title: const Text('2. Raw Materials', style: TextStyle(fontWeight: FontWeight.bold)),
                 isActive: _currentStep >= 1,
                 state: _currentStep > 1 ? StepState.complete : StepState.indexed,
                 content: _buildStepCard(
@@ -453,6 +526,7 @@ class _ManufacturingProcessScreenState extends State<ManufacturingProcessScreen>
                                   onPressed: () => _removeIngredientForm(index),
                                 ),
                               DropdownButtonFormField<String>(
+                                isExpanded: true,
                                 value: controllers.name.text.isEmpty ? null : controllers.name.text,
                                 decoration: const InputDecoration(
                                   labelText: 'Material Name', 
@@ -462,7 +536,10 @@ class _ManufacturingProcessScreenState extends State<ManufacturingProcessScreen>
                                 items: db.rawMaterials.map((rm) {
                                   return DropdownMenuItem<String>(
                                     value: rm.name,
-                                    child: Text('${rm.name} (Stock: ${rm.currentStock} ${rm.unit})'),
+                                    child: Text(
+                                      '${rm.name} (Stock: ${rm.currentStock} ${rm.unit})',
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
                                   );
                                 }).toList(),
                                 onChanged: (val) {
@@ -669,13 +746,13 @@ class _ManufacturingProcessScreenState extends State<ManufacturingProcessScreen>
                 ),
               ),
 
-              // Step 5: Complete Report
+              // Step 5: Other Costs
               Step(
-                title: const Text('5. Complete Report', style: TextStyle(fontWeight: FontWeight.bold)),
+                title: const Text('5. Other Costs', style: TextStyle(fontWeight: FontWeight.bold)),
                 isActive: _currentStep >= 4,
+                state: _currentStep > 4 ? StepState.complete : StepState.indexed,
                 content: Column(
                   children: [
-                    // Other Costs Section
                     Card(
                       elevation: 2,
                       margin: const EdgeInsets.only(bottom: 16),
@@ -750,6 +827,16 @@ class _ManufacturingProcessScreenState extends State<ManufacturingProcessScreen>
                       ),
                     ),
 
+                  ],
+                ),
+              ),
+
+              // Step 6: Complete Report
+              Step(
+                title: const Text('6. Complete Report', style: TextStyle(fontWeight: FontWeight.bold)),
+                isActive: _currentStep >= 5,
+                content: Column(
+                  children: [
                     // Report Card
                     Card(
                       color: Colors.purple.shade50,

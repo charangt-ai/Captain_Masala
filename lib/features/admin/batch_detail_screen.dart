@@ -151,13 +151,44 @@ class BatchDetailScreen extends StatelessWidget {
                 padding: const EdgeInsets.all(16.0),
                 child: Column(
                   children: [
-                    _buildRow('Material Name', batch.rawMaterialName ?? 'N/A'),
+                    if (batch.rawMaterials.isNotEmpty) ...[
+                      ...batch.rawMaterials.map((rm) {
+                        return Column(
+                          children: [
+                            _buildRow('Material', '${rm.name} (${rm.quantity} kg)'),
+                            const Divider(height: 24),
+                          ],
+                        );
+                      }),
+                      _buildRow('Raw Material Amount', rupeeFormat.format(batch.rawMaterials.fold(0.0, (s, i) => s + (i.amount ?? 0)))),
+                    ] else ...[
+                      _buildRow('Material Name', batch.rawMaterialName ?? 'N/A'),
+                      const Divider(height: 24),
+                      _buildRow('Quantity', '${batch.rawMaterialQuantity} kg'),
+                      const Divider(height: 24),
+                      _buildRow('Amount', rupeeFormat.format(batch.rawMaterialAmount ?? 0)),
+                    ],
                     const Divider(height: 24),
-                    _buildRow('Quantity', '${batch.rawMaterialQuantity} kg'),
-                    const Divider(height: 24),
-                    _buildRow('Amount', rupeeFormat.format(batch.rawMaterialAmount ?? 0)),
-                    const Divider(height: 24),
-                    _buildRow('GST (${batch.gstPercentage}%)', rupeeFormat.format(batch.totalGstAmount)),
+                    _buildRow('Total GST', rupeeFormat.format(batch.totalGstAmount)),
+                    if (batch.dryingCost > 0) ...[
+                      const Divider(height: 24),
+                      _buildRow('Drying Process Cost', rupeeFormat.format(batch.dryingCost)),
+                    ],
+                    if (batch.grindingCost > 0) ...[
+                      const Divider(height: 24),
+                      _buildRow('Grinding Process Cost', rupeeFormat.format(batch.grindingCost)),
+                    ],
+                    if (batch.otherCosts.isNotEmpty)
+                      ...batch.otherCosts.map((c) {
+                        final name = c['name']?.toString() ?? 'Other Cost';
+                        final amt = (c['amount'] as num?)?.toDouble() ?? 0.0;
+                        return Column(
+                          children: [
+                            const Divider(height: 24),
+                            _buildRow(name, rupeeFormat.format(amt)),
+                          ],
+                        );
+                      }),
                     const Divider(height: 24),
                     _buildRow('Total Cost', rupeeFormat.format(batch.totalCost), isBold: true, color: AppColors.primaryRed),
                   ],
@@ -220,7 +251,7 @@ class BatchDetailScreen extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(vertical: 16),
               ),
             ),
-            if (isSuperAdmin && !batch.addedToInventory) ...[
+            if (isSuperAdmin && !batch.addedToInventory && batch.status == 'QC_PASSED') ...[
               const SizedBox(height: 12),
               ElevatedButton.icon(
                 onPressed: () => _showApproveDialog(context),
@@ -230,6 +261,40 @@ class BatchDetailScreen extends StatelessWidget {
                   backgroundColor: Colors.blue.shade700,
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 16),
+                ),
+              ),
+            ] else if (isSuperAdmin && !batch.addedToInventory && batch.status == 'QC_PENDING') ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.amber.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.amber.shade200),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.hourglass_empty, color: Colors.amber),
+                    SizedBox(width: 8),
+                    Expanded(child: Text('⏳ Awaiting Quality Control testing. Cannot approve to inventory.', style: TextStyle(color: Colors.amber))),
+                  ],
+                ),
+              ),
+            ] else if (isSuperAdmin && !batch.addedToInventory && batch.status == 'QC_FAILED') ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.red.shade200),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.error_outline, color: Colors.red),
+                    SizedBox(width: 8),
+                    Expanded(child: Text('❌ Failed Quality Control. Cannot approve to inventory.', style: TextStyle(color: Colors.red))),
+                  ],
                 ),
               ),
             ],

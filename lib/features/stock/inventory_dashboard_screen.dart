@@ -7,7 +7,7 @@ import '../production/finished_goods_screen.dart';
 import '../production/batch_costing_screen.dart';
 import '../production/recipe_product_selector_screen.dart';
 import '../admin/manufacturing_process_screen.dart';
-
+import '../production/stock_approval_screen.dart';
 class InventoryDashboardScreen extends StatelessWidget {
   const InventoryDashboardScreen({Key? key}) : super(key: key);
 
@@ -112,6 +112,15 @@ class InventoryDashboardScreen extends StatelessWidget {
             Colors.blueGrey,
             () {
               Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ManufacturingProcessScreen()));
+            },
+          ),
+          _buildDashboardCard(
+            context,
+            'Stock Approvals',
+            Icons.gavel,
+            Colors.redAccent,
+            () {
+              Navigator.of(context).push(MaterialPageRoute(builder: (_) => const StockApprovalScreen()));
             },
           ),
         ],

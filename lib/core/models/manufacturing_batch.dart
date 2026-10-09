@@ -39,6 +39,8 @@ class ManufacturingBatch {
   
   String? targetProductId;
   String? targetProductName;
+  String? planNumber;
+  String? productionPlanId;
 
   String? createdById;
   String? createdByName;
@@ -104,6 +106,8 @@ class ManufacturingBatch {
     return {
       'targetProductId': targetProductId,
       'targetProductName': targetProductName,
+      'planNumber': planNumber,
+      'productionPlanId': productionPlanId,
       'rawMaterialName': rawMaterialName,
       'rawMaterialQuantity': rawMaterialQuantity,
       'rawMaterialAmount': rawMaterialAmount,
@@ -135,6 +139,8 @@ class ManufacturingBatch {
     batch.id = map['_id'] ?? map['id'];
     batch.targetProductId = map['targetProductId'];
     batch.targetProductName = map['targetProductName'];
+    batch.planNumber = map['planNumber'];
+    batch.productionPlanId = map['productionPlanId'];
     batch.rawMaterialName = map['rawMaterialName'];
     batch.rawMaterialQuantity = (map['rawMaterialQuantity'] as num?)?.toDouble();
     batch.rawMaterialAmount = (map['rawMaterialAmount'] as num?)?.toDouble();
