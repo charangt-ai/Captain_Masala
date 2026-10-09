@@ -261,9 +261,19 @@ router.post('/allocations/:id/approve', protect, superAdmin, async (req, res) =>
 
     // Update allocation status
     alloc.status = 'APPROVED';
-    alloc.approvedBy = req.user._id;
+    alloc.approvedBy = req.user._id || req.user.uid || 'admin';
     alloc.approvedAt = new Date();
     await alloc.save({ session });
+
+    // Update original ManufacturingBatch status
+    if (batch.manufacturingBatchId) {
+      const ManufacturingBatch = require('../models/ManufacturingBatch');
+      const mBatch = await ManufacturingBatch.findById(batch.manufacturingBatchId).session(session);
+      if (mBatch) {
+        mBatch.status = 'INVENTORY ADDED';
+        await mBatch.save({ session });
+      }
+    }
 
     await session.commitTransaction();
     res.json({ success: true, message: 'Stock approved and posted to inventory successfully.', data: alloc });

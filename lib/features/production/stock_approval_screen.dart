@@ -240,13 +240,13 @@ class _StockApprovalScreenState extends State<StockApprovalScreen> {
                           mainAxisAlignment: MainAxisAlignment.end,
                           children: [
                             TextButton.icon(
-                              onPressed: () => _returnAllocation(alloc['_id']), 
+                              onPressed: () => _returnAllocation(alloc['id']), 
                               icon: const Icon(Icons.undo, color: Colors.orange), 
                               label: const Text('RETURN', style: TextStyle(color: Colors.orange))
                             ),
                             const SizedBox(width: 16),
                             ElevatedButton.icon(
-                              onPressed: () => _approveAllocation(alloc['_id']),
+                              onPressed: () => _approveAllocation(alloc['id']),
                               style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
                               icon: const Icon(Icons.check, color: Colors.white),
                               label: const Text('APPROVE', style: TextStyle(color: Colors.white)),
