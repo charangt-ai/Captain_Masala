@@ -75,6 +75,7 @@ const ManufacturingBatchSchema = new mongoose.Schema({
       'QC_PENDING',
       'QC_PASSED',
       'QC_FAILED',
+      'COMPLETED',
       'INVENTORY ADDED',
       'CANCELLED'
     ],
