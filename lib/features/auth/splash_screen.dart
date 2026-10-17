@@ -18,6 +18,7 @@ class SplashScreen extends StatefulWidget {
 class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _fadeAnimation;
+  String _statusMessage = 'Connecting to server...';
 
   @override
   void initState() {
@@ -31,6 +32,16 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     );
 
     _controller.forward();
+
+    // After 4 seconds, if still waiting, give warm-up hint
+    Future.delayed(const Duration(seconds: 4), () {
+      if (mounted) {
+        setState(() {
+          _statusMessage = 'Waking up cloud service (Render)...';
+        });
+      }
+    });
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _navigateToNext();
     });
@@ -42,9 +53,9 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     // Step 1: Initialize DatabaseService (reads JWT token from storage)
     bool isAuth = false;
     try {
-      isAuth = await db.init().timeout(const Duration(seconds: 60));
+      isAuth = await db.init().timeout(const Duration(seconds: 25));
     } catch (_) {
-      // Init timed out — proceed anyway
+      // Init timed out — proceed with cached offline credentials
     }
 
     String? resolvedRole;
@@ -96,18 +107,18 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
       body: Center(
         child: FadeTransition(
           opacity: _fadeAnimation,
-          child: const Column(
+          child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              CaptainMasalaLogo(size: 160),
-              SizedBox(height: 48),
-              CircularProgressIndicator(
+              const CaptainMasalaLogo(size: 160),
+              const SizedBox(height: 48),
+              const CircularProgressIndicator(
                 valueColor: AlwaysStoppedAnimation<Color>(Colors.red),
               ),
-              SizedBox(height: 16),
+              const SizedBox(height: 16),
               Text(
-                'Connecting to server...',
-                style: TextStyle(color: Colors.grey, fontSize: 14),
+                _statusMessage,
+                style: const TextStyle(color: Colors.grey, fontSize: 13),
               ),
             ],
           ),

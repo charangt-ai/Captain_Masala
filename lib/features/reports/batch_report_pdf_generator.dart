@@ -8,7 +8,7 @@ import 'package:share_plus/share_plus.dart';
 import '../../core/models/manufacturing_batch.dart';
 
 class BatchReportPdfGenerator {
-  static Future<void> generateAndSharePdf(ManufacturingBatch batch) async {
+  static Future<void> generateAndSharePdf(ManufacturingBatch batch, {List<dynamic> allocations = const []}) async {
     final pdf = pw.Document();
 
     // Theme colors
@@ -21,193 +21,235 @@ class BatchReportPdfGenerator {
     final currencyFormat = NumberFormat.currency(symbol: '', decimalDigits: 2);
 
     pdf.addPage(
-      pw.Page(
+      pw.MultiPage(
         margin: const pw.EdgeInsets.all(32),
         build: (pw.Context context) {
-          return pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
-            children: [
-              // Header Row
-              pw.Row(
-                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                crossAxisAlignment: pw.CrossAxisAlignment.start,
-                children: [
-                  pw.Column(
+          return [
+            // Header Row
+            pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    pw.Text(
+                      'CAPTAIN MASALA AND SPICES',
+                      style: pw.TextStyle(
+                        color: primaryOrange,
+                        fontSize: 20,
+                        fontWeight: pw.FontWeight.bold,
+                      ),
+                    ),
+                    pw.SizedBox(height: 8),
+                    pw.Text('GSTIN: 33AAVFC7408B1ZK', style: const pw.TextStyle(color: PdfColors.grey600, fontSize: 10)),
+                    pw.SizedBox(height: 2),
+                    pw.Text('3/238-B , PUTHUR ITTERI ROAD, NETHIMEDU, SALEM-636002, TAMILNADU', style: const pw.TextStyle(color: PdfColors.grey600, fontSize: 10)),
+                  ],
+                ),
+                pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.end,
+                  children: [
+                    pw.Text(
+                      'MANUFACTURING REPORT',
+                      style: pw.TextStyle(
+                        color: tableHeaderDark,
+                        fontSize: 14,
+                        fontWeight: pw.FontWeight.bold,
+                      ),
+                    ),
+                    pw.SizedBox(height: 4),
+                    pw.Text('Batch ID: ${batch.id != null ? batch.id!.substring(0, 8).toUpperCase() : 'N/A'}', style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey700)),
+                    pw.SizedBox(height: 2),
+                    pw.Text('Date: ${batch.timestamp != null ? dateFormat.format(batch.timestamp!) : 'N/A'}', style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey700)),
+                    pw.SizedBox(height: 2),
+                    pw.Text('Created by: ${batch.createdByName ?? 'N/A'}', style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey700)),
+                    pw.SizedBox(height: 6),
+                    pw.Container(
+                      padding: const pw.EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                      decoration: pw.BoxDecoration(
+                        color: tagYellow,
+                        borderRadius: pw.BorderRadius.circular(12),
+                      ),
+                      child: pw.Text(
+                        batch.status ?? 'COMPLETED',
+                        style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: PdfColors.brown900),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            
+            pw.SizedBox(height: 16),
+            pw.Divider(color: primaryOrange, thickness: 2),
+            pw.SizedBox(height: 16),
+
+            // Product and Raw Material Info
+            pw.Row(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Expanded(
+                  child: pw.Container(
+                    padding: const pw.EdgeInsets.all(12),
+                    decoration: pw.BoxDecoration(
+                      border: pw.Border.all(color: dividerColor),
+                      borderRadius: pw.BorderRadius.circular(8),
+                    ),
+                    child: pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        pw.Text('TARGET PRODUCT', style: pw.TextStyle(fontSize: 9, color: primaryOrange, fontWeight: pw.FontWeight.bold)),
+                        pw.SizedBox(height: 4),
+                        pw.Text(batch.targetProductName ?? 'Unknown', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold, color: tableHeaderDark)),
+                      ],
+                    ),
+                  ),
+                ),
+                pw.SizedBox(width: 16),
+                pw.Expanded(
+                  child: pw.Container(
+                    padding: const pw.EdgeInsets.all(12),
+                    decoration: pw.BoxDecoration(
+                      border: pw.Border.all(color: dividerColor),
+                      borderRadius: pw.BorderRadius.circular(8),
+                    ),
+                    child: pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        pw.Text('RAW MATERIAL SUMMARY', style: pw.TextStyle(fontSize: 9, color: primaryOrange, fontWeight: pw.FontWeight.bold)),
+                        pw.SizedBox(height: 4),
+                        pw.Text(
+                          'Total Cost: Rs. ${currencyFormat.format(batch.rawMaterials.isNotEmpty ? batch.rawMaterials.fold(0.0, (sum, item) => sum + (item.amount ?? 0)) : (batch.rawMaterialAmount ?? 0))}',
+                          style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold, color: tableHeaderDark),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ]
+            ),
+
+            pw.SizedBox(height: 24),
+
+            // Processing Table
+            pw.Table(
+              border: null,
+              columnWidths: {
+                0: const pw.FixedColumnWidth(30),   // #
+                1: const pw.FlexColumnWidth(3),     // STAGE
+                2: const pw.FlexColumnWidth(2),     // BEFORE
+                3: const pw.FlexColumnWidth(2),     // AFTER
+                4: const pw.FlexColumnWidth(2),     // LOSS
+              },
+              children: [
+                pw.TableRow(
+                  decoration: pw.BoxDecoration(
+                    color: tableHeaderDark,
+                    borderRadius: const pw.BorderRadius.vertical(top: pw.Radius.circular(6)),
+                  ),
+                  children: [
+                    _buildHeaderCell('#'),
+                    _buildHeaderCell('PROCESS STAGE'),
+                    _buildHeaderCell('BEFORE (kg)', alignRight: true),
+                    _buildHeaderCell('AFTER (kg)', alignRight: true),
+                    _buildHeaderCell('LOSS (kg)', alignRight: true),
+                  ],
+                ),
+                pw.TableRow(
+                  decoration: const pw.BoxDecoration(
+                    border: pw.Border(bottom: pw.BorderSide(color: PdfColors.grey200)),
+                  ),
+                  children: [
+                    _buildDataCell('1'),
+                    _buildDataCell('Drying'),
+                    _buildDataCell(batch.weightBeforeDrying?.toStringAsFixed(2) ?? '-', alignRight: true),
+                    _buildDataCell(batch.weightAfterDrying?.toStringAsFixed(2) ?? '-', alignRight: true),
+                    _buildDataCell(batch.dryingLoss.toStringAsFixed(2), alignRight: true),
+                  ],
+                ),
+                pw.TableRow(
+                  decoration: const pw.BoxDecoration(
+                    border: pw.Border(bottom: pw.BorderSide(color: PdfColors.grey200)),
+                  ),
+                  children: [
+                    _buildDataCell('2'),
+                    _buildDataCell('Grinding'),
+                    _buildDataCell(batch.weightBeforeGrinding?.toStringAsFixed(2) ?? '-', alignRight: true),
+                    _buildDataCell(batch.weightAfterGrinding?.toStringAsFixed(2) ?? '-', alignRight: true),
+                    _buildDataCell(batch.grindingLoss.toStringAsFixed(2), alignRight: true),
+                  ],
+                ),
+                pw.TableRow(
+                  decoration: const pw.BoxDecoration(
+                    border: pw.Border(bottom: pw.BorderSide(color: PdfColors.grey200)),
+                  ),
+                  children: [
+                    _buildDataCell(''),
+                    _buildDataCell('TOTAL LOSS', isTotal: true),
+                    _buildDataCell(''),
+                    _buildDataCell(''),
+                    _buildDataCell(batch.totalLoss.toStringAsFixed(2), alignRight: true, isTotal: true, color: PdfColors.red800),
+                  ],
+                ),
+              ],
+            ),
+
+            if (allocations.isNotEmpty) ...[
+              pw.SizedBox(height: 24),
+              pw.Text('PACKAGING & STOCK ALLOCATIONS', style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold, color: tableHeaderDark)),
+              pw.SizedBox(height: 8),
+              ...allocations.map((alloc) {
+                final items = alloc['allocations'] as List;
+                return pw.Container(
+                  margin: const pw.EdgeInsets.only(bottom: 12),
+                  padding: const pw.EdgeInsets.all(8),
+                  decoration: pw.BoxDecoration(
+                    border: pw.Border.all(color: dividerColor),
+                    borderRadius: pw.BorderRadius.circular(6),
+                  ),
+                  child: pw.Column(
                     crossAxisAlignment: pw.CrossAxisAlignment.start,
                     children: [
-                      pw.Text(
-                        'CAPTAIN MASALA AND SPICES',
-                        style: pw.TextStyle(
-                          color: primaryOrange,
-                          fontSize: 20,
-                          fontWeight: pw.FontWeight.bold,
-                        ),
-                      ),
-                      pw.SizedBox(height: 8),
-                      pw.Text('GSTIN: 33AAVFC7408B1ZK', style: const pw.TextStyle(color: PdfColors.grey600, fontSize: 10)),
-                      pw.SizedBox(height: 2),
-                      pw.Text('3/238-B , PUTHUR ITTERI ROAD, NETHIMEDU, SALEM-636002, TAMILNADU', style: const pw.TextStyle(color: PdfColors.grey600, fontSize: 10)),
-                    ],
-                  ),
-                  pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.end,
-                    children: [
-                      pw.Text(
-                        'MANUFACTURING REPORT',
-                        style: pw.TextStyle(
-                          color: tableHeaderDark,
-                          fontSize: 14,
-                          fontWeight: pw.FontWeight.bold,
-                        ),
-                      ),
-                      pw.SizedBox(height: 4),
-                      pw.Text('Batch ID: ${batch.id != null ? batch.id!.substring(0, 8).toUpperCase() : 'N/A'}', style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey700)),
-                      pw.SizedBox(height: 2),
-                      pw.Text('Date: ${batch.timestamp != null ? dateFormat.format(batch.timestamp!) : 'N/A'}', style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey700)),
-                      pw.SizedBox(height: 2),
-                      pw.Text('Created by: ${batch.createdByName ?? 'N/A'}', style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey700)),
-                      pw.SizedBox(height: 6),
-                      pw.Container(
-                        padding: const pw.EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                        decoration: pw.BoxDecoration(
-                          color: tagYellow,
-                          borderRadius: pw.BorderRadius.circular(12),
-                        ),
-                        child: pw.Text(
-                          batch.status ?? 'COMPLETED',
-                          style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: PdfColors.brown900),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-              
-              pw.SizedBox(height: 16),
-              pw.Divider(color: primaryOrange, thickness: 2),
-              pw.SizedBox(height: 16),
-
-              // Product and Raw Material Info
-              pw.Row(
-                crossAxisAlignment: pw.CrossAxisAlignment.start,
-                children: [
-                  pw.Expanded(
-                    child: pw.Container(
-                      padding: const pw.EdgeInsets.all(12),
-                      decoration: pw.BoxDecoration(
-                        border: pw.Border.all(color: dividerColor),
-                        borderRadius: pw.BorderRadius.circular(8),
-                      ),
-                      child: pw.Column(
-                        crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      pw.Row(
+                        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                         children: [
-                          pw.Text('TARGET PRODUCT', style: pw.TextStyle(fontSize: 9, color: primaryOrange, fontWeight: pw.FontWeight.bold)),
-                          pw.SizedBox(height: 4),
-                          pw.Text(batch.targetProductName ?? 'Unknown', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold, color: tableHeaderDark)),
-                        ],
+                          pw.Text('ID: ${alloc['allocationNumber'] ?? ''}', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10)),
+                          pw.Text('Status: ${alloc['status']}', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10, color: primaryOrange)),
+                        ]
                       ),
-                    ),
-                  ),
-                  pw.SizedBox(width: 16),
-                  pw.Expanded(
-                    child: pw.Container(
-                      padding: const pw.EdgeInsets.all(12),
-                      decoration: pw.BoxDecoration(
-                        border: pw.Border.all(color: dividerColor),
-                        borderRadius: pw.BorderRadius.circular(8),
-                      ),
-                      child: pw.Column(
-                        crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      pw.Divider(color: dividerColor),
+                      ...items.map((item) {
+                        final product = item['productId'];
+                        final pName = product != null ? product['name'] : 'Unknown Product';
+                        final packSize = product != null ? product['packSize'] : 'N/A';
+                        final packets = item['calculatedPacketCount'] ?? 0;
+                        return pw.Padding(
+                          padding: const pw.EdgeInsets.symmetric(vertical: 2),
+                          child: pw.Row(
+                            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                            children: [
+                              pw.Text('$pName ($packSize)', style: const pw.TextStyle(fontSize: 10)),
+                              pw.Text('$packets pkts', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
+                            ]
+                          )
+                        );
+                      }).toList(),
+                      pw.Divider(color: dividerColor),
+                      pw.Row(
+                        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                         children: [
-                          pw.Text('RAW MATERIAL', style: pw.TextStyle(fontSize: 9, color: primaryOrange, fontWeight: pw.FontWeight.bold)),
-                          pw.SizedBox(height: 4),
-                          if (batch.rawMaterials.isNotEmpty)
-                            ...batch.rawMaterials.asMap().entries.map((e) {
-                              int index = e.key + 1;
-                              var item = e.value;
-                              return pw.Padding(
-                                padding: const pw.EdgeInsets.only(top: 2),
-                                child: pw.Text(
-                                  '$index. ${item.name} - ${item.quantity} kg - Rs. ${item.amount ?? 0}', 
-                                  style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold, color: tableHeaderDark)
-                                ),
-                              );
-                            }).toList()
-                          else
-                            pw.Text('${batch.rawMaterialName} (${batch.rawMaterialQuantity} kg)', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold, color: tableHeaderDark)),
-                        ],
-                      ),
-                    ),
-                  ),
-                ]
-              ),
+                          pw.Text('Total Weight', style: const pw.TextStyle(fontSize: 10)),
+                          pw.Text('${alloc['totalAllocatedKg']} kg', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
+                        ]
+                      )
+                    ]
+                  )
+                );
+              }).toList(),
+            ],
 
-              pw.SizedBox(height: 24),
-
-              // Processing Table
-              pw.Table(
-                border: null,
-                columnWidths: {
-                  0: const pw.FixedColumnWidth(30),   // #
-                  1: const pw.FlexColumnWidth(3),     // STAGE
-                  2: const pw.FlexColumnWidth(2),     // BEFORE
-                  3: const pw.FlexColumnWidth(2),     // AFTER
-                  4: const pw.FlexColumnWidth(2),     // LOSS
-                },
-                children: [
-                  pw.TableRow(
-                    decoration: pw.BoxDecoration(
-                      color: tableHeaderDark,
-                      borderRadius: const pw.BorderRadius.vertical(top: pw.Radius.circular(6)),
-                    ),
-                    children: [
-                      _buildHeaderCell('#'),
-                      _buildHeaderCell('PROCESS STAGE'),
-                      _buildHeaderCell('BEFORE (kg)', alignRight: true),
-                      _buildHeaderCell('AFTER (kg)', alignRight: true),
-                      _buildHeaderCell('LOSS (kg)', alignRight: true),
-                    ],
-                  ),
-                  pw.TableRow(
-                    decoration: const pw.BoxDecoration(
-                      border: pw.Border(bottom: pw.BorderSide(color: PdfColors.grey200)),
-                    ),
-                    children: [
-                      _buildDataCell('1'),
-                      _buildDataCell('Drying'),
-                      _buildDataCell(batch.weightBeforeDrying?.toStringAsFixed(2) ?? '-', alignRight: true),
-                      _buildDataCell(batch.weightAfterDrying?.toStringAsFixed(2) ?? '-', alignRight: true),
-                      _buildDataCell(batch.dryingLoss.toStringAsFixed(2), alignRight: true),
-                    ],
-                  ),
-                  pw.TableRow(
-                    decoration: const pw.BoxDecoration(
-                      border: pw.Border(bottom: pw.BorderSide(color: PdfColors.grey200)),
-                    ),
-                    children: [
-                      _buildDataCell('2'),
-                      _buildDataCell('Grinding'),
-                      _buildDataCell(batch.weightBeforeGrinding?.toStringAsFixed(2) ?? '-', alignRight: true),
-                      _buildDataCell(batch.weightAfterGrinding?.toStringAsFixed(2) ?? '-', alignRight: true),
-                      _buildDataCell(batch.grindingLoss.toStringAsFixed(2), alignRight: true),
-                    ],
-                  ),
-                  pw.TableRow(
-                    decoration: const pw.BoxDecoration(
-                      border: pw.Border(bottom: pw.BorderSide(color: PdfColors.grey200)),
-                    ),
-                    children: [
-                      _buildDataCell(''),
-                      _buildDataCell('TOTAL LOSS', isTotal: true),
-                      _buildDataCell(''),
-                      _buildDataCell(''),
-                      _buildDataCell(batch.totalLoss.toStringAsFixed(2), alignRight: true, isTotal: true, color: PdfColors.red800),
-                    ],
-                  ),
-                ],
-              ),
-
-              pw.SizedBox(height: 24),
+            pw.SizedBox(height: 24),
 
               // Summary Boxes
               pw.Row(
@@ -321,8 +363,7 @@ class BatchReportPdfGenerator {
                   ],
                 ),
               ),
-            ],
-          );
+            ];
         },
       ),
     );

@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const mongoose = require('mongoose');
-const { protect, superAdmin } = require('../middleware/auth');
+const { protect, admin } = require('../middleware/auth');
 const QualityControl = require('../models/QualityControl');
 const ProductionPlan = require('../models/ProductionPlan');
 const ManufacturingBatch = require('../models/ManufacturingBatch');
@@ -11,8 +11,8 @@ const InventoryLog = require('../models/InventoryLog');
 
 // @desc    Submit QC results for a batch
 // @route   POST /api/quality-control
-// @access  Private (QC Inspector / Admin)
-router.post('/', protect, superAdmin, async (req, res) => {
+// @access  Private (Admin / QC Inspector / Super Admin)
+router.post('/', protect, admin, async (req, res) => {
   const session = await mongoose.startSession();
   session.startTransaction();
 
@@ -31,30 +31,58 @@ router.post('/', protect, superAdmin, async (req, res) => {
     const plan = await ProductionPlan.findById(productionPlanId).session(session);
     if (!plan) throw new Error('Production plan not found');
 
-    let batch = await ManufacturingBatch.findById(manufacturingBatchId).session(session);
-    if (!batch) {
-      batch = await ManufacturingBatch.findOne({ productionPlanId }).session(session);
+    // Resilient ManufacturingBatch lookup
+    let batch = null;
+    if (manufacturingBatchId && mongoose.Types.ObjectId.isValid(manufacturingBatchId)) {
+      batch = await ManufacturingBatch.findById(manufacturingBatchId).session(session);
     }
-    if (!batch) throw new Error('Manufacturing batch not found');
+    if (!batch && plan._id) {
+      batch = await ManufacturingBatch.findOne({ productionPlanId: plan._id }).session(session);
+    }
+    if (!batch && plan.manufacturingBatchId) {
+      batch = await ManufacturingBatch.findById(plan.manufacturingBatchId).session(session);
+    }
+    if (!batch && plan.masterProductId) {
+      batch = await ManufacturingBatch.findOne({ targetProductId: plan.masterProductId }).sort({ createdAt: -1 }).session(session);
+    }
+
+    if (!batch) {
+      throw new Error('Manufacturing batch associated with this plan was not found. Please complete the manufacturing process step first.');
+    }
+
+    // Determine actual output weight
+    const parsedBatchWeight = Number(batchWeight);
+    const finalYield = (parsedBatchWeight && parsedBatchWeight > 0)
+      ? parsedBatchWeight
+      : (batch.finalOutputWeight && batch.finalOutputWeight > 0 ? batch.finalOutputWeight : (plan.plannedBatchSize || 0));
+
+    if (finalYield <= 0) {
+      throw new Error('Final batch weight must be greater than 0 kg');
+    }
+
+    // Sync weight back to batch if updated during QC
+    if (parsedBatchWeight && parsedBatchWeight > 0 && parsedBatchWeight !== batch.finalOutputWeight) {
+      batch.finalOutputWeight = parsedBatchWeight;
+    }
 
     const count = await QualityControl.countDocuments();
     const qcNumber = `QC-${new Date().getFullYear()}-${(count + 1).toString().padStart(3, '0')}`;
 
     const qc = new QualityControl({
       qcNumber,
-      productionPlanId,
-      manufacturingBatchId,
+      productionPlanId: plan._id,
+      manufacturingBatchId: batch._id,
       masterProductId: plan.masterProductId,
       masterProductName: plan.masterProductName,
-      parameters,
-      overallResult,
-      batchWeight,
-      sampleSize,
-      inspectedById: req.user._id,
-      inspectedByName: req.user.name || req.user.email,
+      parameters: parameters || [],
+      overallResult: overallResult || 'PENDING',
+      batchWeight: finalYield,
+      sampleSize: Number(sampleSize) || 0,
+      inspectedById: req.user.id || req.user._id,
+      inspectedByName: req.user.name || req.user.email || 'Inspector',
       inspectedAt: Date.now(),
       remarks,
-      rejectionReason
+      rejectionReason: overallResult === 'FAILED' ? rejectionReason : ''
     });
 
     await qc.save({ session });
@@ -75,42 +103,45 @@ router.post('/', protect, superAdmin, async (req, res) => {
         productionPlanId: plan._id,
         manufacturingBatchId: batch._id,
         qcId: qc._id,
-        initialQuantity: batch.finalOutputWeight,
-        currentQuantity: batch.finalOutputWeight,
+        initialQuantity: finalYield,
+        currentQuantity: finalYield,
         manufacturingDate: new Date(),
         expiryDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000) // 1 year expiry
       });
       await fgBatch.save({ session });
 
       // 2. Update Master Product Stock
-      masterProduct.totalStockKg += batch.finalOutputWeight;
+      masterProduct.totalStockKg += finalYield;
       await masterProduct.save({ session });
 
       // 3. Create Inventory Log
       const log = new InventoryLog({
         productId: masterProduct._id.toString(),
         productName: masterProduct.name,
-        changeQuantity: batch.finalOutputWeight,
+        changeQuantity: finalYield,
         type: 'Production Output',
         dateTime: new Date(),
         notes: `Generated FG Batch ${fgBatchNumber} automatically from passed QC ${qc.qcNumber}`,
       });
       await log.save({ session });
 
-      // 4. Update statuses (Mark as COMPLETED directly since FG is generated)
+      // 4. Update statuses
       plan.status = 'COMPLETED';
-      batch.status = 'QC_PASSED'; // Must be a valid enum in ManufacturingBatch schema
+      batch.status = 'QC_PASSED';
+      batch.qcStatus = 'PASSED';
     } else if (overallResult === 'FAILED') {
       plan.status = 'QC_FAILED';
       batch.status = 'QC_FAILED';
+      batch.qcStatus = 'FAILED';
     }
     
     plan.qualityControlId = qc._id;
+    plan.manufacturingBatchId = batch._id;
     await plan.save({ session });
     await batch.save({ session });
 
     await session.commitTransaction();
-    res.status(201).json({ success: true, data: qc });
+    res.status(201).json({ success: true, message: 'QC results submitted successfully', data: qc });
   } catch (error) {
     await session.abortTransaction();
     console.error('Error submitting QC:', error);
@@ -122,8 +153,8 @@ router.post('/', protect, superAdmin, async (req, res) => {
 
 // @desc    Get all QC records
 // @route   GET /api/quality-control
-// @access  Private
-router.get('/', protect, superAdmin, async (req, res) => {
+// @access  Private (Admin)
+router.get('/', protect, admin, async (req, res) => {
   try {
     const query = {};
     if (req.query.overallResult) query.overallResult = req.query.overallResult;
@@ -138,8 +169,8 @@ router.get('/', protect, superAdmin, async (req, res) => {
 
 // @desc    Get QC by Plan ID
 // @route   GET /api/quality-control/plan/:planId
-// @access  Private
-router.get('/plan/:planId', protect, superAdmin, async (req, res) => {
+// @access  Private (Admin)
+router.get('/plan/:planId', protect, admin, async (req, res) => {
   try {
     const qc = await QualityControl.findOne({ productionPlanId: req.params.planId });
     if (!qc) return res.status(404).json({ success: false, message: 'QC record not found for this plan' });

@@ -1,16 +1,99 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 import '../../core/models/manufacturing_batch.dart';
 import '../../core/services/database_service.dart';
 import '../../core/theme.dart';
 import '../../core/permissions.dart';
 import '../reports/batch_report_pdf_generator.dart';
+import '../../core/services/api_config.dart';
 
-class BatchDetailScreen extends StatelessWidget {
+class BatchDetailScreen extends StatefulWidget {
   final ManufacturingBatch batch;
   final DatabaseService dbService;
 
   const BatchDetailScreen({Key? key, required this.batch, required this.dbService}) : super(key: key);
+
+  @override
+  State<BatchDetailScreen> createState() => _BatchDetailScreenState();
+}
+
+class _BatchDetailScreenState extends State<BatchDetailScreen> {
+  late ManufacturingBatch batch;
+  bool _isLoadingAllocations = true;
+  List<dynamic> _allocations = [];
+
+  @override
+  void initState() {
+    super.initState();
+    batch = widget.batch;
+    _fetchAllocations();
+  }
+
+  Future<void> _fetchAllocations() async {
+    setState(() => _isLoadingAllocations = true);
+    try {
+      final response = await http.get(
+        Uri.parse('${ApiConfig.baseUrl}/finished-goods/allocations/by-manufacturing-batch/${batch.id}'),
+        headers: await widget.dbService.getAuthHeaders(),
+      );
+      if (response.statusCode == 200) {
+        final decoded = json.decode(response.body);
+        if (decoded['success'] == true) {
+          setState(() {
+            _allocations = decoded['data'] ?? [];
+            _isLoadingAllocations = false;
+          });
+        } else {
+          setState(() => _isLoadingAllocations = false);
+        }
+      } else {
+        setState(() => _isLoadingAllocations = false);
+      }
+    } catch (e) {
+      print('Error fetching allocations: $e');
+      setState(() => _isLoadingAllocations = false);
+    }
+  }
+
+  Future<void> _approveStock(String allocationId) async {
+    try {
+      final response = await http.post(
+        Uri.parse('${ApiConfig.baseUrl}/finished-goods/allocations/$allocationId/approve'),
+        headers: await widget.dbService.getAuthHeaders(),
+      );
+      if (response.statusCode == 200) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Stock Approved & Added to Inventory!')));
+        setState(() {
+          batch.status = 'INVENTORY ADDED';
+        });
+        _fetchAllocations();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to approve stock')));
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+    }
+  }
+
+  Future<void> _returnStock(String allocationId) async {
+    try {
+      final response = await http.post(
+        Uri.parse('${ApiConfig.baseUrl}/finished-goods/allocations/$allocationId/return'),
+        headers: await widget.dbService.getAuthHeaders(),
+        body: json.encode({'reason': 'Returned from Batch Details screen'}),
+      );
+      if (response.statusCode == 200) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Returned for correction')));
+        _fetchAllocations();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to return stock')));
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+    }
+  }
 
   void _showDeleteDialog(BuildContext context) {
     showDialog(
@@ -29,12 +112,12 @@ class BatchDetailScreen extends StatelessWidget {
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
           ElevatedButton(
             onPressed: () async {
-              Navigator.pop(ctx); // close dialog
-              final success = await dbService.deleteManufacturingBatch(batch.id!);
-              if (context.mounted) {
+              Navigator.pop(ctx);
+              final success = await widget.dbService.deleteManufacturingBatch(batch.id!);
+              if (mounted) {
                 if (success) {
                   ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Batch deleted successfully')));
-                  Navigator.pop(context); // back to list
+                  Navigator.pop(context);
                 } else {
                   ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to delete batch')));
                 }
@@ -61,12 +144,14 @@ class BatchDetailScreen extends StatelessWidget {
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
           ElevatedButton(
             onPressed: () async {
-              Navigator.pop(ctx); // close dialog
-              final success = await dbService.approveManufacturingBatch(batch.id!);
-              if (context.mounted) {
+              Navigator.pop(ctx);
+              final success = await widget.dbService.approveManufacturingBatch(batch.id!);
+              if (mounted) {
                 if (success) {
                   ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Batch approved and added to inventory!')));
-                  Navigator.pop(context); // back to list
+                  setState(() {
+                    batch.status = 'INVENTORY ADDED';
+                  });
                 } else {
                   ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to approve batch')));
                 }
@@ -80,10 +165,159 @@ class BatchDetailScreen extends StatelessWidget {
     );
   }
 
+  Widget _buildRow(String label, String value, {bool isBold = false, double size = 14, Color? color}) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(label, style: TextStyle(fontSize: size, color: Colors.grey.shade700)),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: size,
+            fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
+            color: color ?? Colors.black87,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAllocationsSection() {
+    if (_isLoadingAllocations) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 24),
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (_allocations.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final canApprove = Permissions.isAdmin(widget.dbService.currentUserProfile?.role) ||
+        Permissions.isSuperAdmin(widget.dbService.currentUserProfile?.role);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Text('Packaging & Stock Allocation Breakdown', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        const SizedBox(height: 8),
+        ..._allocations.map((alloc) {
+          final items = alloc['allocations'] as List;
+          final status = alloc['status'] ?? 'PENDING_STOCK_APPROVAL';
+          final isPending = status == 'PENDING_STOCK_APPROVAL';
+          final isApproved = status == 'APPROVED';
+          
+          return Card(
+            elevation: 0,
+            margin: const EdgeInsets.only(bottom: 16),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: BorderSide(
+                color: isApproved
+                    ? AppColors.primaryGreen.withValues(alpha: 0.5)
+                    : isPending
+                        ? Colors.orange.shade300
+                        : Colors.grey.shade300,
+              ),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('Allocation: ${alloc['allocationNumber'] ?? 'N/A'}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: isApproved
+                              ? AppColors.primaryGreen.withValues(alpha: 0.1)
+                              : isPending
+                                  ? Colors.orange.shade50
+                                  : Colors.grey.shade100,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          status,
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: isApproved
+                                ? AppColors.primaryGreen
+                                : isPending
+                                    ? Colors.orange.shade800
+                                    : Colors.grey.shade700,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const Divider(height: 24),
+                  ...items.map((item) {
+                    final product = item['productId'];
+                    final pName = product != null ? product['name'] : 'Unknown Product';
+                    final packSize = product != null ? product['packSize'] : 'N/A';
+                    final packets = item['calculatedPacketCount'] ?? 0;
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 8.0),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(child: Text('$pName ($packSize)')),
+                          Text('$packets packets', style: const TextStyle(fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                  const Divider(height: 24),
+                  _buildRow('Total Allocated Weight', '${alloc['totalAllocatedKg']} kg', isBold: true),
+                  
+                  if (isPending && canApprove) ...[
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () => _returnStock(alloc['_id'] ?? alloc['id'] ?? ''),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: AppColors.primaryRed,
+                              side: const BorderSide(color: AppColors.primaryRed),
+                            ),
+                            child: const Text('Return for Correction', textAlign: TextAlign.center),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: () => _approveStock(alloc['_id'] ?? alloc['id'] ?? ''),
+                            icon: const Icon(Icons.check_circle_outline, size: 16),
+                            label: const Text('APPROVE STOCK', textAlign: TextAlign.center),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.primaryGreen,
+                              foregroundColor: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ]
+                ],
+              ),
+            ),
+          );
+        }).toList(),
+        const SizedBox(height: 24),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final rupeeFormat = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0);
-    final isSuperAdmin = Permissions.isSuperAdmin(dbService.currentUserProfile?.role);
+    final isSuperAdmin = Permissions.isSuperAdmin(widget.dbService.currentUserProfile?.role);
 
     return Scaffold(
       appBar: AppBar(
@@ -122,13 +356,13 @@ class BatchDetailScreen extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
-                    color: batch.addedToInventory ? AppColors.primaryGreen.withOpacity(0.1) : Colors.orange.withOpacity(0.1),
+                    color: batch.addedToInventory || batch.status == 'INVENTORY ADDED' ? AppColors.primaryGreen.withOpacity(0.1) : Colors.orange.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
                     batch.status ?? 'PENDING',
                     style: TextStyle(
-                      color: batch.addedToInventory ? AppColors.primaryGreen : Colors.orange.shade800, 
+                      color: batch.addedToInventory || batch.status == 'INVENTORY ADDED' ? AppColors.primaryGreen : Colors.orange.shade800, 
                       fontWeight: FontWeight.bold, 
                       fontSize: 12
                     ),
@@ -151,23 +385,13 @@ class BatchDetailScreen extends StatelessWidget {
                 padding: const EdgeInsets.all(16.0),
                 child: Column(
                   children: [
-                    if (batch.rawMaterials.isNotEmpty) ...[
-                      ...batch.rawMaterials.map((rm) {
-                        return Column(
-                          children: [
-                            _buildRow('Material', '${rm.name} (${rm.quantity} kg)'),
-                            const Divider(height: 24),
-                          ],
-                        );
-                      }),
-                      _buildRow('Raw Material Amount', rupeeFormat.format(batch.rawMaterials.fold(0.0, (s, i) => s + (i.amount ?? 0)))),
-                    ] else ...[
-                      _buildRow('Material Name', batch.rawMaterialName ?? 'N/A'),
-                      const Divider(height: 24),
-                      _buildRow('Quantity', '${batch.rawMaterialQuantity} kg'),
-                      const Divider(height: 24),
-                      _buildRow('Amount', rupeeFormat.format(batch.rawMaterialAmount ?? 0)),
-                    ],
+                    _buildRow(
+                      'Total Raw Material Cost',
+                      rupeeFormat.format(batch.rawMaterials.isNotEmpty
+                          ? batch.rawMaterials.fold(0.0, (s, i) => s + (i.amount ?? 0))
+                          : (batch.rawMaterialAmount ?? 0)),
+                      isBold: true,
+                    ),
                     const Divider(height: 24),
                     _buildRow('Total GST', rupeeFormat.format(batch.totalGstAmount)),
                     if (batch.dryingCost > 0) ...[
@@ -238,12 +462,15 @@ class BatchDetailScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 32),
+            
+            // Render the fetched Allocations section
+            _buildAllocationsSection(),
 
             // Actions
             const Text('Actions', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
             const SizedBox(height: 12),
             ElevatedButton.icon(
-              onPressed: () => BatchReportPdfGenerator.generateAndSharePdf(batch),
+              onPressed: () => BatchReportPdfGenerator.generateAndSharePdf(batch, allocations: _allocations),
               icon: const Icon(Icons.picture_as_pdf),
               label: const Text('Download PDF Report'),
               style: ElevatedButton.styleFrom(
@@ -315,23 +542,6 @@ class BatchDetailScreen extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-
-  Widget _buildRow(String label, String value, {bool isBold = false, double size = 14, Color? color}) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(label, style: TextStyle(fontSize: size, color: Colors.grey.shade700)),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: size,
-            fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
-            color: color ?? Colors.black87,
-          ),
-        ),
-      ],
     );
   }
 }

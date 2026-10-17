@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -36,6 +37,8 @@ class DatabaseService extends ChangeNotifier {
   bool _hasMoreSales = true;
   bool _hasMoreLogs = true;
   bool _isOfflineMode = false;
+  bool _isReconnecting = false;
+  Timer? _reconnectTimer;
   int _salesSkip = 0;
   int _logsSkip = 0;
   final int _pageSize = 200;
@@ -54,6 +57,7 @@ class DatabaseService extends ChangeNotifier {
   bool get hasMoreSales => _hasMoreSales;
   bool get hasMoreLogs => _hasMoreLogs;
   bool get isOfflineMode => _isOfflineMode;
+  bool get isReconnecting => _isReconnecting;
 
   // Helper for requests
   Future<Map<String, String>> _getHeaders() async {
@@ -63,6 +67,10 @@ class DatabaseService extends ChangeNotifier {
       if (token != null) 'Authorization': 'Bearer $token',
     };
   }
+
+  Future<Map<String, String>> getAuthHeaders() => _getHeaders();
+
+
 
   // Helper to parse dates correctly
   DateTime? _parseDate(dynamic value) {
@@ -80,7 +88,7 @@ class DatabaseService extends ChangeNotifier {
         final res = await http.get(
           Uri.parse('${ApiConfig.baseUrl}/users/me'),
           headers: await _getHeaders(),
-        );
+        ).timeout(const Duration(seconds: 15));
         if (res.statusCode == 200) {
           final data = json.decode(res.body);
           _currentUserProfile = AppUser(
@@ -92,6 +100,7 @@ class DatabaseService extends ChangeNotifier {
             username: data['username'] ?? '',
           );
           _isOfflineMode = false;
+          _reconnectTimer?.cancel();
           await _loadAllData();
           return true;
         } else {
@@ -104,10 +113,69 @@ class DatabaseService extends ChangeNotifier {
         if (cachedProfile != null) {
           _currentUserProfile = cachedProfile;
           _isOfflineMode = true;
+          startBackgroundReconnection();
           return true;
         }
       }
     }
+    return false;
+  }
+
+  /// Automatically pings the server periodically in the background when in offline mode
+  void startBackgroundReconnection() {
+    _reconnectTimer?.cancel();
+    _reconnectTimer = Timer.periodic(const Duration(seconds: 15), (timer) async {
+      if (!_isOfflineMode) {
+        timer.cancel();
+        return;
+      }
+      await retryConnection(silent: true);
+    });
+  }
+
+  /// Explicitly retry connection from UI or background timer
+  Future<bool> retryConnection({bool silent = false}) async {
+    if (_isReconnecting) return false;
+    _isReconnecting = true;
+    if (!silent) notifyListeners();
+
+    try {
+      final healthUri = Uri.parse(ApiConfig.baseUrl.replaceAll('/api', '/health'));
+      final healthRes = await http.get(healthUri).timeout(const Duration(seconds: 10));
+
+      if (healthRes.statusCode == 200) {
+        final token = await _storage.read(key: 'jwt_token');
+        if (token != null) {
+          final meRes = await http.get(
+            Uri.parse('${ApiConfig.baseUrl}/users/me'),
+            headers: await _getHeaders(),
+          ).timeout(const Duration(seconds: 15));
+
+          if (meRes.statusCode == 200) {
+            final data = json.decode(meRes.body);
+            _currentUserProfile = AppUser(
+              id: data['id'],
+              name: data['name'] ?? '',
+              email: data['email'],
+              phoneNumber: data['phoneNumber'] ?? '',
+              role: data['role'] ?? 'pending',
+              username: data['username'] ?? '',
+            );
+            _isOfflineMode = false;
+            _reconnectTimer?.cancel();
+            _isReconnecting = false;
+            notifyListeners();
+            await _loadAllData();
+            return true;
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Reconnection attempt failed: $e');
+    }
+
+    _isReconnecting = false;
+    if (!silent) notifyListeners();
     return false;
   }
 
@@ -337,7 +405,9 @@ class DatabaseService extends ChangeNotifier {
     await _fetchLogs();
   }
 
+  @override
   void dispose() {
+    _reconnectTimer?.cancel();
     super.dispose();
   }
 
@@ -364,6 +434,7 @@ class DatabaseService extends ChangeNotifier {
           username: data['username'],
         );
         _isOfflineMode = false;
+        _reconnectTimer?.cancel();
         await OfflineAuthService.cacheCredentials(trimmedUser, trimmedPass, _currentUserProfile!);
         await _loadAllData();
         notifyListeners();
@@ -377,6 +448,7 @@ class DatabaseService extends ChangeNotifier {
       if (cachedProfile != null) {
         _currentUserProfile = cachedProfile;
         _isOfflineMode = true;
+        startBackgroundReconnection();
         notifyListeners();
         return cachedProfile.role;
       }
@@ -1026,19 +1098,39 @@ class DatabaseService extends ChangeNotifier {
     }
   }
 
-  // --- Quality Control ---
-
-  Future<bool> submitQualityControl(Map<String, dynamic> qcData) async {
+  Future<Map<String, dynamic>> submitQualityControl(Map<String, dynamic> qcData) async {
     try {
       final res = await http.post(
         Uri.parse('${ApiConfig.baseUrl}/quality-control'),
         headers: await _getHeaders(),
         body: json.encode(qcData),
       );
-      return res.statusCode == 201 || res.statusCode == 200;
+      
+      final isSuccess = res.statusCode == 201 || res.statusCode == 200;
+      String message = 'Quality Control submitted';
+      try {
+        final decoded = json.decode(res.body);
+        if (decoded is Map && decoded['message'] != null) {
+          message = decoded['message'];
+        }
+      } catch (_) {}
+
+      if (isSuccess) {
+        await _fetchMasterProducts();
+        await _fetchLogs(reset: true);
+        notifyListeners();
+      }
+
+      return {
+        'success': isSuccess,
+        'message': message,
+      };
     } catch (e) {
       debugPrint('Error submitting QC: $e');
-      return false;
+      return {
+        'success': false,
+        'message': e.toString(),
+      };
     }
   }
 

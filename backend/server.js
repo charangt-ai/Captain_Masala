@@ -55,12 +55,16 @@ app.use('/api/batch-costing', batchCostingRoutes);
 // Initialize Cron Jobs
 setupCronJobs();
 
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
 app.get('/', (req, res) => {
   res.send('Captain Masala API is running');
 });
 
 const PORT = process.env.PORT || 3000;
 
-app.listen(PORT, '0.0.0.0', () => {
+const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);
 });

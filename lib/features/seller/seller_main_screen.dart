@@ -61,12 +61,40 @@ class _SellerMainScreenState extends State<SellerMainScreen> {
           if (db.isOfflineMode)
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-              color: Colors.orange.shade800,
-              child: const Text(
-                '⚠️ Offline Mode — Data may be outdated. Connect to server.',
-                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                textAlign: TextAlign.center,
+              padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 16),
+              color: Colors.amber.shade900,
+              child: Row(
+                children: [
+                  const Icon(Icons.cloud_off_rounded, color: Colors.white, size: 18),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text(
+                      'Offline Mode — Working with local data',
+                      style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  if (db.isReconnecting)
+                    const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    )
+                  else
+                    TextButton.icon(
+                      onPressed: () => db.retryConnection(),
+                      icon: const Icon(Icons.refresh, size: 14, color: Colors.white),
+                      label: const Text(
+                        'Reconnect',
+                        style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                      ),
+                      style: TextButton.styleFrom(
+                        backgroundColor: Colors.white.withValues(alpha: 0.2),
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                    ),
+                ],
               ),
             ),
           Expanded(child: _screens[_currentIndex]),

@@ -135,6 +135,7 @@ router.post('/batch', protect, async (req, res) => {
       const plan = await ProductionPlan.findById(batch.productionPlanId).session(session);
       if (plan) {
         plan.manufacturingBatchId = batch._id;
+        plan.status = 'IN_PRODUCTION';
         await plan.save({ session });
       }
     }
@@ -256,26 +257,9 @@ router.post('/batch/:id/approve', protect, async (req, res) => {
       throw new Error('Cannot add to inventory. Batch must pass Quality Control first.');
     }
 
-    // 1. Deduct Raw Material
-    // NOTE: Raw material is now deducted immediately upon batch creation (in POST /batch).
-    // No need to deduct it here again.
-
-    // 2. Add Final Output to Master Stock
-    masterProduct.totalStockKg += batch.finalOutputWeight;
-    await masterProduct.save({ session });
-
-    // 3. Log the Addition
-    const yieldLog = new InventoryLog({
-      productId: masterProduct._id.toString(),
-      productName: masterProduct.name,
-      changeQuantity: batch.finalOutputWeight,
-      type: 'Manufacturing Yield',
-      dateTime: new Date(),
-      notes: `Batch processed. Yield: ${batch.finalOutputWeight}kg from ${batch.rawMaterialQuantity}kg of ${batch.rawMaterialName}`,
-    });
-    await yieldLog.save({ session });
-
-    // 4. Mark Batch as added
+    // 1. Raw material was deducted upon batch creation.
+    // 2. Bulk stock and InventoryLog were already credited to MasterProduct during QC Pass (in qualityControl.js).
+    // Here we mark the batch as added to inventory to prevent re-processing.
     batch.addedToInventory = true;
     batch.status = 'INVENTORY ADDED';
     await batch.save({ session });

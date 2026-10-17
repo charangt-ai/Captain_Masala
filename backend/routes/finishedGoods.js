@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const mongoose = require('mongoose');
-const { protect, superAdmin } = require('../middleware/auth');
+const { protect, admin, superAdmin } = require('../middleware/auth');
 const FinishedGoodsBatch = require('../models/FinishedGoodsBatch');
 const MasterProduct = require('../models/MasterProduct');
 const ProductionPlan = require('../models/ProductionPlan');
@@ -76,8 +76,8 @@ router.post('/', protect, superAdmin, async (req, res) => {
 
 // @desc    Get all Finished Goods Batches
 // @route   GET /api/finished-goods
-// @access  Private
-router.get('/', protect, superAdmin, async (req, res) => {
+// @access  Private (Admin)
+router.get('/', protect, admin, async (req, res) => {
   try {
     const query = {};
     if (req.query.status) query.status = req.query.status;
@@ -111,8 +111,8 @@ router.put('/:id/status', protect, superAdmin, async (req, res) => {
 
 // @desc    Allocate packaging (convert bulk to packets) -> Pending Stock Approval
 // @route   POST /api/finished-goods/:id/allocate
-// @access  Private
-router.post('/:id/allocate', protect, superAdmin, async (req, res) => {
+// @access  Private (Admin)
+router.post('/:id/allocate', protect, admin, async (req, res) => {
   try {
     const batchId = req.params.id;
     const { allocations } = req.body; // Array of { productId, allocatedKg }
@@ -120,6 +120,18 @@ router.post('/:id/allocate', protect, superAdmin, async (req, res) => {
     
     const batch = await FinishedGoodsBatch.findById(batchId);
     if (!batch) throw new Error('Finished Goods Batch not found');
+
+    // Guard: Prevent duplicate pending packaging allocations for the same batch
+    const existingPending = await PackagingAllocation.findOne({
+      finishedGoodsBatchId: batchId,
+      status: 'PENDING_STOCK_APPROVAL'
+    });
+    if (existingPending) {
+      return res.status(400).json({
+        success: false,
+        message: `A packaging allocation (${existingPending.allocationNumber}) is already pending approval for this batch.`
+      });
+    }
 
     let totalAllocated = 0;
     for (let alloc of allocations) {
@@ -312,5 +324,49 @@ router.post('/allocations/:id/return', protect, superAdmin, async (req, res) => 
   }
 });
 
+
+// @desc    Get packaging allocations by manufacturing batch ID
+// @route   GET /api/finished-goods/allocations/by-manufacturing-batch/:id
+// @access  Private
+router.get('/allocations/by-manufacturing-batch/:id', protect, async (req, res) => {
+  try {
+    const FinishedGoodsBatch = require('../models/FinishedGoodsBatch');
+    const PackagingAllocation = require('../models/PackagingAllocation');
+    const ManufacturingBatch = require('../models/ManufacturingBatch');
+    
+    // Strategy 1: Find FinishedGoodsBatch directly linked to this manufacturingBatchId
+    let fgBatches = await FinishedGoodsBatch.find({ manufacturingBatchId: req.params.id });
+
+    // Strategy 2: If not found, check if manufacturing batch has a productionPlanId
+    if (!fgBatches || fgBatches.length === 0) {
+      const mBatch = await ManufacturingBatch.findById(req.params.id);
+      if (mBatch) {
+        if (mBatch.productionPlanId) {
+          fgBatches = await FinishedGoodsBatch.find({ productionPlanId: mBatch.productionPlanId });
+        }
+        // Strategy 3: Match by master product if still empty
+        if ((!fgBatches || fgBatches.length === 0) && mBatch.targetProductId) {
+          fgBatches = await FinishedGoodsBatch.find({ masterProductId: mBatch.targetProductId });
+        }
+      }
+    }
+
+    if (!fgBatches || fgBatches.length === 0) {
+      return res.json({ success: true, data: [] });
+    }
+
+    const fgBatchIds = fgBatches.map(b => b._id);
+    const allocations = await PackagingAllocation.find({ finishedGoodsBatchId: { $in: fgBatchIds } })
+      .populate('finishedGoodsBatchId')
+      .populate('preparedBy', 'name email')
+      .populate('allocations.productId', 'name packSize')
+      .sort({ createdAt: -1 });
+      
+    res.json({ success: true, data: allocations });
+  } catch (error) {
+    console.error('Error fetching allocations by manufacturing batch:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
 
 module.exports = router;
