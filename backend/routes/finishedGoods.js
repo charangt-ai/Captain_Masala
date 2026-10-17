@@ -228,7 +228,7 @@ router.get('/allocations/pending', protect, superAdmin, async (req, res) => {
 // @desc    Approve a packaging allocation (Atomic Posting)
 // @route   POST /api/finished-goods/allocations/:id/approve
 // @access  Private
-router.post('/allocations/:id/approve', protect, superAdmin, async (req, res) => {
+router.post('/allocations/:id/approve', protect, async (req, res) => {
   const session = await mongoose.startSession();
   session.startTransaction();
   try {

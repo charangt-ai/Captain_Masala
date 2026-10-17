@@ -117,7 +117,7 @@ class _PackagingAllocationScreenState extends State<PackagingAllocationScreen> {
     return 0.0;
   }
 
-  Future<void> _savePackaging() async {
+  void _onReviewPressed() {
     if (_totalAllocated > widget.batch.currentQuantity) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Cannot allocate more than available bulk quantity (${widget.batch.currentQuantity} kg).')),
@@ -127,11 +127,272 @@ class _PackagingAllocationScreenState extends State<PackagingAllocationScreen> {
 
     if (_totalAllocated <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please allocate some quantity before saving.')),
+        const SnackBar(content: Text('Please allocate some quantity before proceeding.')),
       );
       return;
     }
 
+    final List<Map<String, dynamic>> activeItems = [];
+    int totalPackets = 0;
+    for (var p in _products) {
+      final id = p['_id'] ?? p['id'];
+      final controller = _controllers[id];
+      if (controller == null) continue;
+      final val = double.tryParse(controller.text) ?? 0.0;
+      if (val > 0) {
+        final packSizeStr = p['packSize'] ?? '0g';
+        final sizeInKg = _getSizeInKg(packSizeStr);
+        final count = sizeInKg > 0 ? (val / sizeInKg).floor() : 0;
+        totalPackets += count;
+        activeItems.add({
+          'productId': id,
+          'productName': p['name'] ?? packSizeStr,
+          'packSize': packSizeStr,
+          'allocatedKg': val,
+          'packetCount': count,
+        });
+      }
+    }
+
+    _showApprovalReviewSheet(activeItems, totalPackets);
+  }
+
+  void _showApprovalReviewSheet(List<Map<String, dynamic>> activeItems, int totalPackets) {
+    final double remaining = widget.batch.currentQuantity - _totalAllocated;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          padding: EdgeInsets.only(
+            top: 16,
+            left: 20,
+            right: 20,
+            bottom: MediaQuery.of(sheetContext).viewInsets.bottom + 24,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Drag Handle
+              Center(
+                child: Container(
+                  width: 44,
+                  height: 5,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Title Header
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.green.shade50,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(Icons.verified_outlined, color: Colors.green.shade700, size: 28),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Stock Approval & Review',
+                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                        ),
+                        Text(
+                          '${widget.batch.masterProductName ?? 'Product'} | Batch ${widget.batch.batchNumber}',
+                          style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(sheetContext),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+
+              // Summary Stats Row
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey.shade200),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    _buildModalStat('Available Bulk', '${widget.batch.currentQuantity.toStringAsFixed(2)} KG', Colors.black87),
+                    Container(height: 30, width: 1, color: Colors.grey.shade300),
+                    _buildModalStat('Allocated', '${_totalAllocated.toStringAsFixed(2)} KG', AppColors.primaryRed),
+                    Container(height: 30, width: 1, color: Colors.grey.shade300),
+                    _buildModalStat('Remaining', '${remaining.toStringAsFixed(2)} KG', Colors.green.shade700),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Breakdown Header
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('PACKAGE BREAKDOWN', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 0.5, color: Colors.grey)),
+                  Text('Total: $totalPackets Packets', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.green.shade800)),
+                ],
+              ),
+              const SizedBox(height: 8),
+
+              // Items List
+              Flexible(
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  physics: const BouncingScrollPhysics(),
+                  itemCount: activeItems.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 8),
+                  itemBuilder: (context, index) {
+                    final item = activeItems[index];
+                    return Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Colors.grey.shade200),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.blue.shade50,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              item['packSize'],
+                              style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue.shade800, fontSize: 13),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('${item['allocatedKg'].toStringAsFixed(2)} KG Powder', style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13)),
+                                Text('Yield: ${item['packetCount']} units', style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
+                              ],
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: Colors.green.shade50,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.green.shade200),
+                            ),
+                            child: Text(
+                              '${item['packetCount']} Pkts',
+                              style: TextStyle(color: Colors.green.shade800, fontWeight: FontWeight.bold, fontSize: 13),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Information callout
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade50.withAlpha(128),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.info_outline, size: 16, color: Colors.blue.shade700),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Approving will immediately credit packets into retail stock and deduct bulk powder.',
+                        style: TextStyle(fontSize: 11, color: Colors.blue.shade900),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Primary Action: APPROVE STOCK NOW
+              ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.pop(sheetContext);
+                  _submitAllocation(activeItems, autoApprove: true);
+                },
+                icon: const Icon(Icons.check_circle_outline, color: Colors.white),
+                label: const Text(
+                  'APPROVE STOCK NOW',
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green.shade700,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  elevation: 2,
+                ),
+              ),
+              const SizedBox(height: 8),
+
+              // Secondary Action: SAVE AS PENDING
+              OutlinedButton(
+                onPressed: () {
+                  Navigator.pop(sheetContext);
+                  _submitAllocation(activeItems, autoApprove: false);
+                },
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.grey.shade700,
+                  side: BorderSide(color: Colors.grey.shade400),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: const Text('Save as Pending (Approve Later)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildModalStat(String label, String value, Color color) {
+    return Column(
+      children: [
+        Text(label, style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
+        const SizedBox(height: 4),
+        Text(value, style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: color)),
+      ],
+    );
+  }
+
+  Future<void> _submitAllocation(List<Map<String, dynamic>> items, {required bool autoApprove}) async {
     setState(() {
       _isLoading = true;
     });
@@ -140,17 +401,7 @@ class _PackagingAllocationScreenState extends State<PackagingAllocationScreen> {
       final storage = const FlutterSecureStorage();
       final token = await storage.read(key: 'jwt_token');
 
-      final List<Map<String, dynamic>> allocations = [];
-      for (var entry in _controllers.entries) {
-        final val = double.tryParse(entry.value.text) ?? 0.0;
-        if (val > 0) {
-          allocations.add({
-            'productId': entry.key,
-            'allocatedKg': val,
-          });
-        }
-      }
-
+      // 1. Submit allocation
       final response = await http.post(
         Uri.parse('${ApiConfig.baseUrl}/finished-goods/${widget.batch.id}/allocate'),
         headers: {
@@ -158,31 +409,86 @@ class _PackagingAllocationScreenState extends State<PackagingAllocationScreen> {
           if (token != null) 'Authorization': 'Bearer $token',
         },
         body: json.encode({
-          'allocations': allocations,
+          'allocations': items.map((i) => {
+            'productId': i['productId'],
+            'allocatedKg': i['allocatedKg'],
+          }).toList(),
         }),
       );
 
-      if (response.statusCode == 201) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Packaging allocation submitted for stock approval!')),
-        );
-        Navigator.pop(context, true); // Return true to signal refresh
-      } else {
+      if (response.statusCode != 201) {
         final decoded = json.decode(response.body);
+        if (!mounted) return;
+        setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed: ${decoded['message']}')),
+          SnackBar(
+            content: Text('Allocation failed: ${decoded['message'] ?? 'Unknown error'}'),
+            backgroundColor: Colors.red,
+          ),
         );
-        setState(() {
-          _isLoading = false;
-        });
+        return;
+      }
+
+      final decoded = json.decode(response.body);
+      final allocData = decoded['data'];
+      final allocId = allocData != null ? (allocData['_id'] ?? allocData['id']) : null;
+
+      if (autoApprove && allocId != null) {
+        // 2. Automatically approve allocation immediately
+        final approveResponse = await http.post(
+          Uri.parse('${ApiConfig.baseUrl}/finished-goods/allocations/$allocId/approve'),
+          headers: {
+            'Content-Type': 'application/json',
+            if (token != null) 'Authorization': 'Bearer $token',
+          },
+        );
+
+        if (approveResponse.statusCode == 200) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Row(
+                children: [
+                  Icon(Icons.check_circle, color: Colors.white),
+                  SizedBox(width: 8),
+                  Expanded(child: Text('Stock Approved! Retail inventory updated successfully.')),
+                ],
+              ),
+              backgroundColor: Colors.green,
+              duration: Duration(seconds: 3),
+            ),
+          );
+          Navigator.pop(context, true); // Return true to signal refresh
+          return;
+        } else {
+          final approveDecoded = json.decode(approveResponse.body);
+          if (!mounted) return;
+          setState(() => _isLoading = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Allocation saved, but approval failed: ${approveDecoded['message'] ?? 'Error'}'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+          Navigator.pop(context, true);
+          return;
+        }
+      } else {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Packaging allocation saved and pending stock approval.'),
+            backgroundColor: Colors.blue,
+          ),
+        );
+        Navigator.pop(context, true);
       }
     } catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
+        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
       );
-      setState(() {
-        _isLoading = false;
-      });
     }
   }
 
@@ -333,14 +639,18 @@ class _PackagingAllocationScreenState extends State<PackagingAllocationScreen> {
                       ),
                       
                       const SizedBox(height: 24),
-                      ElevatedButton(
-                        onPressed: isError ? null : _savePackaging,
+                      ElevatedButton.icon(
+                        onPressed: isError ? null : _onReviewPressed,
+                        icon: const Icon(Icons.assignment_turned_in_outlined, color: Colors.white),
+                        label: const Text(
+                          'REVIEW & APPROVE PACKAGING',
+                          style: TextStyle(fontSize: 16, color: Colors.white, fontWeight: FontWeight.bold),
+                        ),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.primaryRed,
                           padding: const EdgeInsets.symmetric(vertical: 16),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         ),
-                        child: const Text('SAVE & SUBMIT FOR APPROVAL', style: TextStyle(fontSize: 16, color: Colors.white, fontWeight: FontWeight.bold)),
                       ),
                     ],
                   ),
