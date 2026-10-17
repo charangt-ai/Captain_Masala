@@ -386,12 +386,33 @@ router.get('/allocations/by-manufacturing-batch/:id', protect, async (req, res) 
 router.get('/allocations/by-fg-batch/:id', protect, admin, async (req, res) => {
   try {
     const PackagingAllocation = require('../models/PackagingAllocation');
+    const Product = require('../models/Product');
+
     const allocations = await PackagingAllocation.find({ finishedGoodsBatchId: req.params.id })
       .populate('preparedBy', 'name email')
       .populate('approvedBy', 'name email')
       .populate('allocations.productId', 'name packSize price')
       .sort({ createdAt: -1 });
-    res.json({ success: true, data: allocations });
+
+    // Format and handle backward compatibility
+    const formatted = await Promise.all(allocations.map(async (doc) => {
+      const a = doc.toObject();
+      if (!a.allocations || a.allocations.length === 0) {
+        const pid = doc.get('productId');
+        const p = pid ? await Product.findById(pid) : null;
+        const kg = doc.get('allocatedQuantityKg') || a.totalAllocatedKg || 0;
+        const pkts = doc.get('packetCount') || 0;
+        a.allocations = [{
+          productId: p ? { name: p.name, packSize: p.packSize } : { name: pid || 'Packed Product', packSize: '' },
+          packSize: p?.packSize || '',
+          allocatedKg: kg,
+          calculatedPacketCount: pkts,
+        }];
+      }
+      return a;
+    }));
+
+    res.json({ success: true, data: formatted });
   } catch (error) {
     console.error('Error fetching allocations by FG batch:', error);
     res.status(500).json({ success: false, message: 'Server error' });

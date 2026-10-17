@@ -70,17 +70,20 @@ class _PackagingAllocationScreenState extends State<PackagingAllocationScreen> {
           _controllers[p['_id'] ?? p['id']] = controller;
         }
 
+        if (!mounted) return;
         setState(() {
           _products = filteredProducts;
           _isLoading = false;
         });
       } else {
+        if (!mounted) return;
         setState(() {
           _errorMessage = 'Failed to load products: ${response.statusCode}';
           _isLoading = false;
         });
       }
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _errorMessage = 'Error: $e';
         _isLoading = false;
