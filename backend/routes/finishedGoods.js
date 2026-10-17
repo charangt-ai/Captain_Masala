@@ -83,7 +83,13 @@ router.get('/', protect, admin, async (req, res) => {
     if (req.query.status) query.status = req.query.status;
     if (req.query.masterProductId) query.masterProductId = req.query.masterProductId;
 
-    const batches = await FinishedGoodsBatch.find(query).sort({ expiryDate: 1 });
+    // Auto-heal: Ensure batches with 0 currentQuantity are marked DEPLETED
+    await FinishedGoodsBatch.updateMany(
+      { currentQuantity: { $lte: 0 }, status: 'ACTIVE' },
+      { $set: { currentQuantity: 0, status: 'DEPLETED' } }
+    );
+
+    const batches = await FinishedGoodsBatch.find(query).sort({ createdAt: -1 });
     res.json({ success: true, count: batches.length, data: batches });
   } catch (error) {
     console.error('Error fetching FG batches:', error);
@@ -261,11 +267,16 @@ router.post('/allocations/:id/approve', protect, superAdmin, async (req, res) =>
 
     // Deduct from bulk stock
     batch.currentQuantity -= alloc.totalAllocatedKg;
+    if (batch.currentQuantity <= 0) {
+      batch.currentQuantity = 0;
+      batch.status = 'DEPLETED';
+    }
     
     // Also deduct from MasterProduct totalStockKg
     const masterProduct = await MasterProduct.findById(batch.masterProductId).session(session);
     if (masterProduct) {
       masterProduct.totalStockKg -= alloc.totalAllocatedKg;
+      if (masterProduct.totalStockKg < 0) masterProduct.totalStockKg = 0;
       await masterProduct.save({ session });
     }
 
@@ -365,6 +376,24 @@ router.get('/allocations/by-manufacturing-batch/:id', protect, async (req, res) 
     res.json({ success: true, data: allocations });
   } catch (error) {
     console.error('Error fetching allocations by manufacturing batch:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// @desc    Get packaging allocations by Finished Goods Batch ID (Packaging History)
+// @route   GET /api/finished-goods/allocations/by-fg-batch/:id
+// @access  Private (Admin)
+router.get('/allocations/by-fg-batch/:id', protect, admin, async (req, res) => {
+  try {
+    const PackagingAllocation = require('../models/PackagingAllocation');
+    const allocations = await PackagingAllocation.find({ finishedGoodsBatchId: req.params.id })
+      .populate('preparedBy', 'name email')
+      .populate('approvedBy', 'name email')
+      .populate('allocations.productId', 'name packSize price')
+      .sort({ createdAt: -1 });
+    res.json({ success: true, data: allocations });
+  } catch (error) {
+    console.error('Error fetching allocations by FG batch:', error);
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });

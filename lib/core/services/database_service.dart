@@ -1154,6 +1154,23 @@ class DatabaseService extends ChangeNotifier {
     }
   }
 
+  Future<List<dynamic>> fetchAllocationsByFgBatch(String fgBatchId) async {
+    try {
+      final res = await http.get(
+        Uri.parse('${ApiConfig.baseUrl}/finished-goods/allocations/by-fg-batch/$fgBatchId'),
+        headers: await _getHeaders(),
+      );
+      if (res.statusCode == 200) {
+        final decoded = json.decode(res.body);
+        return decoded['data'] ?? [];
+      }
+      return [];
+    } catch (e) {
+      debugPrint('Error fetching allocations by FG batch: $e');
+      return [];
+    }
+  }
+
   Future<bool> generateFinishedGoods(Map<String, dynamic> data) async {
     try {
       final res = await http.post(
