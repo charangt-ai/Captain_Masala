@@ -716,6 +716,30 @@ class DatabaseService extends ChangeNotifier {
     return false;
   }
 
+  Future<bool> allocateMasterProductToPackets(
+    String masterId,
+    List<Map<String, dynamic>> allocations,
+  ) async {
+    try {
+      final res = await http.post(
+        Uri.parse('${ApiConfig.baseUrl}/master-products/$masterId/allocate-to-packets'),
+        headers: await _getHeaders(),
+        body: json.encode({'allocations': allocations}),
+      );
+      if (res.statusCode == 200) {
+        await _fetchMasterProducts();
+        await _fetchProducts();
+        await _fetchLogs(reset: true);
+        notifyListeners();
+        return true;
+      }
+      return false;
+    } catch (e) {
+      print('Error allocating master product to packets: $e');
+      return false;
+    }
+  }
+
   Future<bool> updateStock(String productId, double newOpeningStock, String notes) async {
     final res = await http.put(
       Uri.parse('${ApiConfig.baseUrl}/inventory-logs/stock/$productId'),

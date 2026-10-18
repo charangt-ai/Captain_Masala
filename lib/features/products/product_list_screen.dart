@@ -155,6 +155,321 @@ class ProductListScreen extends StatelessWidget {
     );
   }
 
+  double _getSizeInKg(String packSizeStr) {
+    final ps = packSizeStr.toLowerCase().trim();
+    final numberString = ps.replaceAll(RegExp(r'[^0-9.]'), '');
+    final number = double.tryParse(numberString) ?? 0.0;
+    if (ps.contains('kg')) {
+      return number;
+    } else if (ps.contains('g') || ps.contains('gram')) {
+      return number / 1000.0;
+    }
+    return 0.0;
+  }
+
+  void _showAllocatePacketsSheet(
+    BuildContext context,
+    MasterProduct m,
+    List<Product> variants,
+    DatabaseService db,
+  ) {
+    final Map<String, TextEditingController> controllers = {};
+    for (var p in variants) {
+      controllers[p.id] = TextEditingController();
+    }
+
+    bool isSubmitting = false;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetCtx) {
+        return StatefulBuilder(
+          builder: (ctx, setSheetState) {
+            double totalAllocatedKg = 0.0;
+            int totalNewPackets = 0;
+            final List<Map<String, dynamic>> activeAllocations = [];
+
+            for (var p in variants) {
+              final c = controllers[p.id];
+              final val = double.tryParse(c?.text ?? '') ?? 0.0;
+              final sizeInKg = _getSizeInKg(p.packSize);
+              final pkts = sizeInKg > 0 ? (val / sizeInKg).floor() : 0;
+              if (val > 0 && pkts > 0) {
+                totalAllocatedKg += val;
+                totalNewPackets += pkts;
+                activeAllocations.add({
+                  'productId': p.id,
+                  'allocatedKg': val,
+                  'packetCount': pkts,
+                });
+              }
+            }
+
+            final double remainingBulk = m.totalStockKg - totalAllocatedKg;
+            final bool isOverAllocated = remainingBulk < -0.001;
+
+            return Container(
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              padding: EdgeInsets.only(
+                top: 16,
+                left: 20,
+                right: 20,
+                bottom: MediaQuery.of(sheetCtx).viewInsets.bottom + 24,
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // Drag Handle
+                    Center(
+                      child: Container(
+                        width: 44,
+                        height: 5,
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade300,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Header
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: Colors.amber.shade50,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(Icons.inventory_2_outlined, color: Colors.amber.shade800, size: 26),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Allocate into Packets',
+                                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                              ),
+                              Text(
+                                '${m.name} | Available Bulk: ${m.totalStockKg.toStringAsFixed(1)} kg',
+                                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close),
+                          onPressed: () => Navigator.pop(sheetCtx),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Stats Banner
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade50,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.grey.shade200),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceAround,
+                        children: [
+                          _buildStatItem('Available Bulk', '${m.totalStockKg.toStringAsFixed(1)} kg', Colors.black87),
+                          Container(height: 30, width: 1, color: Colors.grey.shade300),
+                          _buildStatItem('Allocating', '${totalAllocatedKg.toStringAsFixed(1)} kg', AppColors.primaryRed),
+                          Container(height: 30, width: 1, color: Colors.grey.shade300),
+                          _buildStatItem(
+                            'Remaining',
+                            '${remainingBulk.toStringAsFixed(1)} kg',
+                            isOverAllocated ? Colors.red : Colors.green.shade700,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    const Text(
+                      'ENTER WEIGHT PER VARIANT (KG):',
+                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 0.5, color: Colors.grey),
+                    ),
+                    const SizedBox(height: 8),
+
+                    // Variant input rows
+                    ...variants.map((p) {
+                      final c = controllers[p.id]!;
+                      final val = double.tryParse(c.text) ?? 0.0;
+                      final sizeInKg = _getSizeInKg(p.packSize);
+                      final pkts = sizeInKg > 0 ? (val / sizeInKg).floor() : 0;
+
+                      return Card(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        elevation: 0,
+                        color: Colors.grey.shade50,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          side: BorderSide(color: Colors.grey.shade200),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: Colors.blue.shade50,
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  p.packSize,
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.blue.shade800,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                flex: 3,
+                                child: TextField(
+                                  controller: c,
+                                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                  decoration: const InputDecoration(
+                                    labelText: 'KG',
+                                    hintText: 'e.g. 10',
+                                    isDense: true,
+                                    border: OutlineInputBorder(),
+                                    contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                    suffixText: 'kg',
+                                  ),
+                                  onChanged: (_) => setSheetState(() {}),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                flex: 2,
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    const Text('Yield', style: TextStyle(fontSize: 10, color: Colors.grey)),
+                                    Text(
+                                      '$pkts pkts',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 14,
+                                        color: pkts > 0 ? Colors.green.shade800 : Colors.grey,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    }),
+
+                    if (isOverAllocated)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 8),
+                        child: Text(
+                          '❌ INSUFFICIENT BULK QUANTITY. Please reduce weights.',
+                          style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 12),
+                        ),
+                      ),
+
+                    const SizedBox(height: 16),
+
+                    // Submit Button
+                    ElevatedButton.icon(
+                      onPressed: (isSubmitting || isOverAllocated || totalAllocatedKg <= 0)
+                          ? null
+                          : () async {
+                              setSheetState(() => isSubmitting = true);
+                              final success = await db.allocateMasterProductToPackets(
+                                m.id,
+                                activeAllocations,
+                              );
+                              if (sheetCtx.mounted) {
+                                Navigator.pop(sheetCtx);
+                              }
+                              if (context.mounted) {
+                                if (success) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Row(
+                                        children: [
+                                          const Icon(Icons.check_circle, color: Colors.white),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: Text('Successfully credited $totalNewPackets packets to ${m.name}!'),
+                                          ),
+                                        ],
+                                      ),
+                                      backgroundColor: Colors.green,
+                                      duration: const Duration(seconds: 3),
+                                    ),
+                                  );
+                                } else {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('Failed to allocate packets. Check server logs.'),
+                                      backgroundColor: Colors.red,
+                                    ),
+                                  );
+                                }
+                              }
+                            },
+                      icon: isSubmitting
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                            )
+                          : const Icon(Icons.check_circle_outline, color: Colors.white),
+                      label: Text(
+                        isSubmitting
+                            ? 'CREDITING STOCK...'
+                            : 'APPROVE & CREDIT $totalNewPackets PACKETS',
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.white),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green.shade700,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildStatItem(String label, String value, Color color) {
+    return Column(
+      children: [
+        Text(label, style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
+        const SizedBox(height: 4),
+        Text(value, style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: color)),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final db = Provider.of<DatabaseService>(context);
@@ -174,6 +489,17 @@ class ProductListScreen extends StatelessWidget {
         final isLowStock = m.totalStockKg < 50.0;
         final isOutOfStock = m.totalStockKg <= 0;
         final variants = db.products.where((p) => p.masterProductId == m.id).toList();
+
+        int totalPackets = 0;
+        double totalPackedKg = 0.0;
+        for (var p in variants) {
+          final pkts = p.remainingStock.toInt();
+          totalPackets += pkts;
+          final sizeInKg = _getSizeInKg(p.packSize);
+          totalPackedKg += pkts * sizeInKg;
+        }
+        final bool hasUnallocatedBulk = m.totalStockKg > 0;
+        final bool noPacketsAllocated = totalPackets == 0;
 
         return Card(
           margin: const EdgeInsets.only(bottom: 12),
@@ -282,7 +608,32 @@ class ProductListScreen extends StatelessWidget {
                 ),
               ),
             ),
-            subtitle: Text('${variants.length} variant(s)'),
+            subtitle: Row(
+              children: [
+                Text('${variants.length} variant(s)'),
+                if (totalPackets > 0) ...[
+                  const Text(' • '),
+                  Text(
+                    '$totalPackets pkts ready',
+                    style: TextStyle(
+                      color: Colors.green.shade700,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                    ),
+                  ),
+                ] else if (hasUnallocatedBulk) ...[
+                  const Text(' • '),
+                  Text(
+                    'No packets ready',
+                    style: TextStyle(
+                      color: Colors.amber.shade800,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ],
+            ),
             trailing: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.end,
@@ -298,106 +649,252 @@ class ProductListScreen extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  isOutOfStock ? 'Out of stock' : (isLowStock ? 'Low stock' : 'In stock'),
+                  isOutOfStock ? 'Out of bulk' : (noPacketsAllocated ? 'Bulk only' : 'In stock'),
                   style: TextStyle(
                     fontSize: 10,
                     color: isOutOfStock
                         ? AppColors.outOfStockAlert
-                        : (isLowStock ? AppColors.lowStockAlert : AppColors.primaryGreen),
+                        : (noPacketsAllocated ? Colors.amber.shade800 : AppColors.primaryGreen),
                     fontWeight: FontWeight.bold,
                   ),
                 ),
               ],
             ),
-            children: variants.map((p) {
-              return ListTile(
-                onLongPress: isSuperAdmin ? () {
-                  showModalBottomSheet(
-                    context: context,
-                    builder: (ctx) => SafeArea(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          ListTile(
-                            leading: const Icon(Icons.edit),
-                            title: const Text('Edit Variant'),
-                            onTap: () {
-                              Navigator.pop(ctx);
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) => ProductDetailScreen(product: p, initialTabIndex: 1),
-                                ),
-                              );
-                            },
-                          ),
-                          if (p.id != '1' && p.id != '2' && p.id != '3' && p.id != '4' && p.id != '5' && p.id != '6' && p.id != '7' && p.id != '8')
-                            ListTile(
-                              leading: const Icon(Icons.delete, color: AppColors.outOfStockAlert),
-                              title: const Text('Delete Variant', style: TextStyle(color: AppColors.outOfStockAlert)),
-                              onTap: () {
-                                Navigator.pop(ctx);
-                                showDialog(
-                                  context: context,
-                                  builder: (dialogCtx) => AlertDialog(
-                                    title: const Text('Delete Variant'),
-                                    content: Text('Are you sure you want to delete ${p.packSize}?'),
-                                    actions: [
-                                      TextButton(onPressed: () => Navigator.of(dialogCtx).pop(), child: const Text('Cancel')),
-                                      ElevatedButton(
-                                        style: ElevatedButton.styleFrom(backgroundColor: AppColors.outOfStockAlert),
-                                        onPressed: () {
-                                          db.deleteProduct(p.id);
-                                          Navigator.of(dialogCtx).pop();
-                                        },
-                                        child: const Text('Delete'),
+            children: [
+              // Summary row: Bulk Available vs Packed Packets
+              Container(
+                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: Colors.grey.shade200),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.inventory_2_outlined, size: 16, color: Colors.grey.shade700),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Bulk: ${m.totalStockKg.toStringAsFixed(1)} kg',
+                          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                        ),
+                      ],
+                    ),
+                    Container(height: 16, width: 1, color: Colors.grey.shade300),
+                    Row(
+                      children: [
+                        Icon(Icons.check_circle_outline, size: 16, color: Colors.green.shade700),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Packed: $totalPackets pkts (${totalPackedKg.toStringAsFixed(1)} kg)',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.green.shade800),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+
+              // Alert banner if no packets allocated yet
+              if (noPacketsAllocated && hasUnallocatedBulk)
+                Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.amber.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.amber.shade200),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.info_outline, size: 16, color: Colors.amber.shade900),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'No retail packets allocated yet for this product. Use the button below to allocate available bulk stock into sellable packets.',
+                          style: TextStyle(fontSize: 11, color: Colors.amber.shade900),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+              // Variant rows
+              ...variants.map((p) {
+                final pkts = p.remainingStock.toInt();
+                final sizeInKg = _getSizeInKg(p.packSize);
+                final variantKg = pkts * sizeInKg;
+                final isOut = pkts <= 0;
+                final isLow = pkts > 0 && pkts < 10;
+
+                return Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.grey.shade200),
+                  ),
+                  child: ListTile(
+                    dense: true,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+                    onLongPress: isSuperAdmin ? () {
+                      showModalBottomSheet(
+                        context: context,
+                        builder: (ctx) => SafeArea(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              ListTile(
+                                leading: const Icon(Icons.edit),
+                                title: const Text('Edit Variant'),
+                                onTap: () {
+                                  Navigator.pop(ctx);
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) => ProductDetailScreen(product: p, initialTabIndex: 1),
+                                    ),
+                                  );
+                                },
+                              ),
+                              if (p.id != '1' && p.id != '2' && p.id != '3' && p.id != '4' && p.id != '5' && p.id != '6' && p.id != '7' && p.id != '8')
+                                ListTile(
+                                  leading: const Icon(Icons.delete, color: AppColors.outOfStockAlert),
+                                  title: const Text('Delete Variant', style: TextStyle(color: AppColors.outOfStockAlert)),
+                                  onTap: () {
+                                    Navigator.pop(ctx);
+                                    showDialog(
+                                      context: context,
+                                      builder: (dialogCtx) => AlertDialog(
+                                        title: const Text('Delete Variant'),
+                                        content: Text('Are you sure you want to delete ${p.packSize}?'),
+                                        actions: [
+                                          TextButton(onPressed: () => Navigator.of(dialogCtx).pop(), child: const Text('Cancel')),
+                                          ElevatedButton(
+                                            style: ElevatedButton.styleFrom(backgroundColor: AppColors.outOfStockAlert),
+                                            onPressed: () {
+                                              db.deleteProduct(p.id);
+                                              Navigator.of(dialogCtx).pop();
+                                            },
+                                            child: const Text('Delete'),
+                                          ),
+                                        ],
                                       ),
-                                    ],
-                                  ),
-                                );
-                              },
-                            ),
-                        ],
+                                    );
+                                  },
+                                ),
+                            ],
+                          ),
+                        ),
+                      );
+                    } : null,
+                    leading: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.shade50,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        p.packSize,
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.blue.shade800,
+                          fontSize: 12,
+                        ),
                       ),
                     ),
-                  );
-                } : null,
-                title: InkWell(
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => ProductDetailScreen(product: p),
-                      ),
-                    );
-                  },
-                  child: Text(
-                    'Pack: ${p.packSize}',
-                    style: TextStyle(
-                      color: Theme.of(context).primaryColor,
-                      decoration: p.isEnabled ? TextDecoration.underline : TextDecoration.lineThrough,
+                    title: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: isOut
+                                ? Colors.red.shade50
+                                : (isLow ? Colors.amber.shade50 : Colors.green.shade50),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(
+                              color: isOut
+                                  ? Colors.red.shade200
+                                  : (isLow ? Colors.amber.shade300 : Colors.green.shade300),
+                            ),
+                          ),
+                          child: Text(
+                            '$pkts Packets',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                              color: isOut
+                                  ? Colors.red.shade800
+                                  : (isLow ? Colors.amber.shade900 : Colors.green.shade800),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          '(${variantKg.toStringAsFixed(1)} kg)',
+                          style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                        ),
+                      ],
+                    ),
+                    subtitle: Text(
+                      'Price: ${rupeeFormat.format(p.wholesalePrice)} / pkt',
+                      style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
+                    ),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.edit_outlined, size: 18),
+                          tooltip: 'Edit details',
+                          onPressed: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => ProductDetailScreen(product: p),
+                              ),
+                            );
+                          },
+                        ),
+                        if (isSuperAdmin)
+                          Switch(
+                            value: p.isEnabled,
+                            onChanged: (val) {
+                              final updated = p.copyWith(isEnabled: val);
+                              db.updateProduct(updated);
+                            },
+                            activeColor: AppColors.primaryGreen,
+                          ),
+                      ],
+                    ),
+                  ),
+                );
+              }),
+
+              // Allocate Stock into Packets Action Button
+              if (hasUnallocatedBulk)
+                Container(
+                  margin: const EdgeInsets.fromLTRB(16, 6, 16, 12),
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () => _showAllocatePacketsSheet(context, m, variants, db),
+                    icon: const Icon(Icons.inventory_2_outlined, size: 16),
+                    label: Text(
+                      noPacketsAllocated
+                          ? 'ALLOCATE ${m.totalStockKg.toStringAsFixed(1)} KG INTO PACKETS'
+                          : 'ALLOCATE MORE BULK INTO PACKETS',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: noPacketsAllocated ? AppColors.primaryRed : Colors.blue.shade700,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      elevation: 1,
                     ),
                   ),
                 ),
-                subtitle: Text('Price: ${rupeeFormat.format(p.wholesalePrice)}'),
-                trailing: isSuperAdmin ? Switch(
-                  value: p.isEnabled,
-                  onChanged: (val) {
-                    final updated = Product(
-                      id: p.id,
-                      name: p.name,
-                      packSize: p.packSize,
-                      wholesalePrice: p.wholesalePrice,
-                      remainingStock: p.remainingStock,
-                      isEnabled: val,
-                      imageUrl: p.imageUrl,
-                      masterProductId: p.masterProductId,
-                      categoryId: p.categoryId,
-                    );
-                    db.updateProduct(updated);
-                  },
-                  activeColor: AppColors.primaryGreen,
-                ) : null,
-              );
-            }).toList(),
+            ],
           ),
         );
       },
