@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../../core/services/api_config.dart';
+import '../../core/services/database_service.dart';
 import '../../core/theme.dart';
 import '../../core/models/inventory/finished_goods_batch.dart';
 
@@ -453,6 +455,13 @@ class _PackagingAllocationScreenState extends State<PackagingAllocationScreen> {
         );
 
         if (approveResponse.statusCode == 200) {
+          if (!mounted) return;
+          try {
+            final db = Provider.of<DatabaseService>(context, listen: false);
+            await db.refreshProductsAndStock();
+          } catch (e) {
+            debugPrint('Failed to refresh db after packaging approval: $e');
+          }
           if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(

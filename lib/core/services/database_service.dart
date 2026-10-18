@@ -202,6 +202,23 @@ class DatabaseService extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> refreshProductsAndStock() async {
+    try {
+      await Future.wait([
+        _fetchProducts(),
+        _fetchMasterProducts(),
+        _fetchLogs(reset: true),
+      ]);
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error refreshing products and stock: $e');
+    }
+  }
+
+  Future<void> refreshAllData() async {
+    await _loadAllData();
+  }
+
   Future<void> _fetchProducts() async {
     final res = await http.get(Uri.parse('${ApiConfig.baseUrl}/products'), headers: await _getHeaders());
     if (res.statusCode == 200) {

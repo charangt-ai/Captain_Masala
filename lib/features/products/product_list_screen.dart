@@ -994,9 +994,16 @@ class ProductListScreen extends StatelessWidget {
       },
     );
 
+    Widget content = RefreshIndicator(
+      onRefresh: () async {
+        await db.refreshProductsAndStock();
+      },
+      child: listBody,
+    );
+
     if (isEmbedded) {
       return Scaffold(
-        body: listBody,
+        body: content,
         floatingActionButton: isSuperAdmin ? FloatingActionButton(
           onPressed: () => _showAddEditProductDialog(context),
           backgroundColor: AppColors.primaryGreen,
@@ -1010,7 +1017,7 @@ class ProductListScreen extends StatelessWidget {
       appBar: AppBar(
         title: const Text('Product Catalog'),
       ),
-      body: listBody,
+      body: content,
       floatingActionButton: isSuperAdmin ? FloatingActionButton(
         onPressed: () => _showAddEditProductDialog(context),
         backgroundColor: AppColors.primaryGreen,
