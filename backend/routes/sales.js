@@ -10,15 +10,15 @@ const router = express.Router();
 
 // Helper
 const getPackSizeInKg = (packSize) => {
-  const lower = packSize.toLowerCase();
-  if (lower === '50 gram - 1 kg bag' || lower === '50g - 1kg bag' || (lower.includes('50') && lower.includes('1 kg'))) {
+  const lower = packSize.toLowerCase().trim();
+  if (lower.includes('50') && (lower.includes('1kg') || lower.includes('1 kg') || lower.includes('bag'))) {
     return 1.0; 
   }
   if (lower.includes('kg')) {
     const match = /([0-9.]+)\s*kg/.exec(lower);
     if (match) return parseFloat(match[1]) || 1.0;
   } else if (lower.includes('gram') || lower.includes(' g') || lower.endsWith('g')) {
-    const match = /([0-9.]+)\s*(?:gram|g)/.exec(lower);
+    const match = /([0-9.]+)\s*(?:grams|gram|gm|g)/.exec(lower);
     if (match) return (parseFloat(match[1]) || 0.0) / 1000.0;
   }
   return 1.0;

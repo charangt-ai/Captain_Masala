@@ -852,15 +852,15 @@ class DatabaseService extends ChangeNotifier {
   }
 
   double getPackSizeInKg(String packSize) {
-    final lower = packSize.toLowerCase();
-    if (lower == '50 gram - 1 kg bag' || lower == '50g - 1kg bag' || (lower.contains('50') && lower.contains('1 kg'))) {
+    final lower = packSize.toLowerCase().trim();
+    if (lower.contains('50') && (lower.contains('1kg') || lower.contains('1 kg') || lower.contains('bag'))) {
       return 1.0; 
     }
     if (lower.contains('kg')) {
       final match = RegExp(r'([0-9.]+)\s*kg').firstMatch(lower);
       if (match != null) return double.tryParse(match.group(1) ?? '') ?? 1.0;
     } else if (lower.contains('gram') || lower.contains(' g') || lower.endsWith('g')) {
-      final match = RegExp(r'([0-9.]+)\s*(?:gram|g)').firstMatch(lower);
+      final match = RegExp(r'([0-9.]+)\s*(?:grams|gram|gm|g)').firstMatch(lower);
       if (match != null) return (double.tryParse(match.group(1) ?? '') ?? 0.0) / 1000.0;
     }
     return 1.0;

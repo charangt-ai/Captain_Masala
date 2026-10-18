@@ -156,14 +156,26 @@ class ProductListScreen extends StatelessWidget {
   }
 
   double _getSizeInKg(String packSizeStr) {
-    final ps = packSizeStr.toLowerCase().trim();
-    final numberString = ps.replaceAll(RegExp(r'[^0-9.]'), '');
-    final number = double.tryParse(numberString) ?? 0.0;
-    if (ps.contains('kg')) {
-      return number;
-    } else if (ps.contains('g') || ps.contains('gram')) {
-      return number / 1000.0;
+    final lower = packSizeStr.toLowerCase().trim();
+
+    // 1. Compound master bags like "50g-1kg", "50g - 1 kg bag", "50 gram - 1 kg bag"
+    if (lower.contains('50') && (lower.contains('1kg') || lower.contains('1 kg') || lower.contains('bag'))) {
+      return 1.0;
     }
+
+    // 2. Explicit KG patterns (e.g. "1kg", "1 kg", "2.5 kg")
+    final kgMatch = RegExp(r'([0-9.]+)\s*kg').firstMatch(lower);
+    if (kgMatch != null) {
+      return double.tryParse(kgMatch.group(1) ?? '') ?? 1.0;
+    }
+
+    // 3. Gram patterns (e.g. "500 g", "500g", "50 grams", "250gm")
+    final gMatch = RegExp(r'([0-9.]+)\s*(?:grams|gram|gm|g)').firstMatch(lower);
+    if (gMatch != null) {
+      final grams = double.tryParse(gMatch.group(1) ?? '') ?? 0.0;
+      return grams / 1000.0;
+    }
+
     return 0.0;
   }
 
@@ -678,7 +690,7 @@ class ProductListScreen extends StatelessWidget {
                         Icon(Icons.inventory_2_outlined, size: 16, color: Colors.grey.shade700),
                         const SizedBox(width: 6),
                         Text(
-                          'Bulk: ${m.totalStockKg.toStringAsFixed(1)} kg',
+                          'Bulk (Unpacked): ${m.totalStockKg.toStringAsFixed(1)} kg',
                           style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
                         ),
                       ],
@@ -689,7 +701,7 @@ class ProductListScreen extends StatelessWidget {
                         Icon(Icons.check_circle_outline, size: 16, color: Colors.green.shade700),
                         const SizedBox(width: 6),
                         Text(
-                          'Packed: $totalPackets pkts (${totalPackedKg.toStringAsFixed(1)} kg)',
+                          'Ready Packets: $totalPackets pkts (${totalPackedKg.toStringAsFixed(1)} kg)',
                           style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.green.shade800),
                         ),
                       ],
@@ -797,7 +809,7 @@ class ProductListScreen extends StatelessWidget {
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(
-                        p.packSize,
+                        p.packSize.toLowerCase().replaceAll(' ', '') == '50g-1kg' ? '50g (1kg Bag)' : p.packSize,
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
                           color: Colors.blue.shade800,

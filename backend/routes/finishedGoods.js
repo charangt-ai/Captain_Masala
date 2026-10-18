@@ -156,18 +156,22 @@ router.post('/:id/allocate', protect, admin, async (req, res) => {
       const product = await Product.findById(alloc.productId);
       if (!product) throw new Error(`Product not found for id ${alloc.productId}`);
 
-      // Calculate size in KG from packSize string (e.g. '100g' -> 0.1, '1kg' -> 1.0)
+      // Calculate size in KG from packSize string (e.g. '100g' -> 0.1, '1kg' -> 1.0, '50g-1kg' -> 1.0)
       let sizeInKg = 0;
-      const ps = product.packSize.toLowerCase().trim();
-      const numberString = ps.replace(/[^0-9.]/g, '');
-      const number = parseFloat(numberString) || 0;
-      
-      if (ps.includes('kg')) {
-        sizeInKg = number;
-      } else if (ps.includes('g') || ps.includes('gram')) {
-        sizeInKg = number / 1000;
+      const lower = product.packSize.toLowerCase().trim();
+
+      if (lower.includes('50') && (lower.includes('1kg') || lower.includes('1 kg') || lower.includes('bag'))) {
+        sizeInKg = 1.0;
       } else {
-        throw new Error(`Invalid packSize format for ${product.name}: ${product.packSize}`);
+        const kgMatch = /([0-9.]+)\s*kg/.exec(lower);
+        if (kgMatch) {
+          sizeInKg = parseFloat(kgMatch[1]) || 1.0;
+        } else {
+          const gMatch = /([0-9.]+)\s*(?:grams|gram|gm|g)/.exec(lower);
+          if (gMatch) {
+            sizeInKg = (parseFloat(gMatch[1]) || 0) / 1000.0;
+          }
+        }
       }
 
       if (sizeInKg <= 0) throw new Error(`Could not parse packSize: ${product.packSize}`);
