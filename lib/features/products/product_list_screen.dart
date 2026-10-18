@@ -208,12 +208,13 @@ class ProductListScreen extends StatelessWidget {
               final val = double.tryParse(c?.text ?? '') ?? 0.0;
               final sizeInKg = _getSizeInKg(p.packSize);
               final pkts = sizeInKg > 0 ? (val / sizeInKg).floor() : 0;
+              final actualKgUsed = pkts * sizeInKg;
               if (val > 0 && pkts > 0) {
-                totalAllocatedKg += val;
+                totalAllocatedKg += actualKgUsed;
                 totalNewPackets += pkts;
                 activeAllocations.add({
                   'productId': p.id,
-                  'allocatedKg': val,
+                  'allocatedKg': actualKgUsed,
                   'packetCount': pkts,
                 });
               }
@@ -343,11 +344,11 @@ class ProductListScreen extends StatelessWidget {
                                   borderRadius: BorderRadius.circular(6),
                                 ),
                                 child: Text(
-                                  p.packSize,
+                                  p.packSize.toLowerCase().replaceAll(' ', '') == '50g-1kg' ? '50g (1kg Bag)' : p.packSize,
                                   style: TextStyle(
                                     fontWeight: FontWeight.bold,
                                     color: Colors.blue.shade800,
-                                    fontSize: 14,
+                                    fontSize: 13,
                                   ),
                                 ),
                               ),
@@ -357,13 +358,14 @@ class ProductListScreen extends StatelessWidget {
                                 child: TextField(
                                   controller: c,
                                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                  decoration: const InputDecoration(
-                                    labelText: 'KG',
+                                  decoration: InputDecoration(
+                                    labelText: 'Bulk Weight',
                                     hintText: 'e.g. 10',
                                     isDense: true,
-                                    border: OutlineInputBorder(),
-                                    contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                    border: const OutlineInputBorder(),
+                                    contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                                     suffixText: 'kg',
+                                    helperText: pkts > 0 ? '$pkts pkts' : null,
                                   ),
                                   onChanged: (_) => setSheetState(() {}),
                                 ),
@@ -383,6 +385,11 @@ class ProductListScreen extends StatelessWidget {
                                         color: pkts > 0 ? Colors.green.shade800 : Colors.grey,
                                       ),
                                     ),
+                                    if (pkts > 0 && sizeInKg > 0)
+                                      Text(
+                                        '${(pkts * sizeInKg).toStringAsFixed(1)} kg used',
+                                        style: TextStyle(fontSize: 9, color: Colors.grey.shade600),
+                                      ),
                                   ],
                                 ),
                               ),
@@ -498,8 +505,6 @@ class ProductListScreen extends StatelessWidget {
       itemCount: validMasterProducts.length,
       itemBuilder: (ctx, idx) {
         final m = validMasterProducts[idx];
-        final isLowStock = m.totalStockKg < 50.0;
-        final isOutOfStock = m.totalStockKg <= 0;
         final variants = db.products.where((p) => p.masterProductId == m.id).toList();
 
         int totalPackets = 0;
@@ -510,6 +515,10 @@ class ProductListScreen extends StatelessWidget {
           final sizeInKg = _getSizeInKg(p.packSize);
           totalPackedKg += pkts * sizeInKg;
         }
+
+        final double totalBrandKg = m.totalStockKg + totalPackedKg;
+        final bool isOutOfStock = totalBrandKg <= 0;
+        final bool isLowStock = totalBrandKg > 0 && totalBrandKg < 50.0;
         final bool hasUnallocatedBulk = m.totalStockKg > 0;
         final bool noPacketsAllocated = totalPackets == 0;
 
@@ -651,7 +660,7 @@ class ProductListScreen extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text(
-                  '${m.totalStockKg.toStringAsFixed(1)} kg',
+                  '${totalBrandKg.toStringAsFixed(1)} kg',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
@@ -661,50 +670,123 @@ class ProductListScreen extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  isOutOfStock ? 'Out of bulk' : (noPacketsAllocated ? 'Bulk only' : 'In stock'),
+                  isOutOfStock
+                      ? 'Out of stock'
+                      : (totalPackets > 0
+                          ? '$totalPackets pkts ready'
+                          : 'Bulk only'),
                   style: TextStyle(
                     fontSize: 10,
                     color: isOutOfStock
                         ? AppColors.outOfStockAlert
-                        : (noPacketsAllocated ? Colors.amber.shade800 : AppColors.primaryGreen),
+                        : (totalPackets > 0 ? AppColors.primaryGreen : Colors.amber.shade800),
                     fontWeight: FontWeight.bold,
                   ),
                 ),
               ],
             ),
             children: [
-              // Summary row: Bulk Available vs Packed Packets
-              Container(
-                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade50,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: Colors.grey.shade200),
-                ),
+              // Summary 2-card row: Bulk Available vs Packed Packets
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                 child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Row(
-                      children: [
-                        Icon(Icons.inventory_2_outlined, size: 16, color: Colors.grey.shade700),
-                        const SizedBox(width: 6),
-                        Text(
-                          'Bulk (Unpacked): ${m.totalStockKg.toStringAsFixed(1)} kg',
-                          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                    // Bulk Powder Card
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: Colors.amber.shade50.withValues(alpha: 0.6),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: Colors.amber.shade200),
                         ),
-                      ],
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(Icons.inventory_2_outlined, size: 14, color: Colors.amber.shade900),
+                                const SizedBox(width: 4),
+                                Expanded(
+                                  child: Text(
+                                    'BULK POWDER',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                      letterSpacing: 0.5,
+                                      color: Colors.amber.shade900,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '${m.totalStockKg.toStringAsFixed(1)} kg',
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black87,
+                              ),
+                            ),
+                            Text(
+                              m.totalStockKg > 0 ? 'In storage drums' : 'No bulk powder',
+                              style: TextStyle(fontSize: 10, color: Colors.grey.shade600),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
-                    Container(height: 16, width: 1, color: Colors.grey.shade300),
-                    Row(
-                      children: [
-                        Icon(Icons.check_circle_outline, size: 16, color: Colors.green.shade700),
-                        const SizedBox(width: 6),
-                        Text(
-                          'Ready Packets: $totalPackets pkts (${totalPackedKg.toStringAsFixed(1)} kg)',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.green.shade800),
+                    const SizedBox(width: 8),
+                    // Ready Packets Card
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: Colors.green.shade50.withValues(alpha: 0.6),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: Colors.green.shade200),
                         ),
-                      ],
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(Icons.shopping_bag_outlined, size: 14, color: Colors.green.shade900),
+                                const SizedBox(width: 4),
+                                Expanded(
+                                  child: Text(
+                                    'READY PACKETS',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                      letterSpacing: 0.5,
+                                      color: Colors.green.shade900,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '${totalPackedKg.toStringAsFixed(1)} kg',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.green.shade900,
+                              ),
+                            ),
+                            Text(
+                              '$totalPackets packets sealed',
+                              style: TextStyle(fontSize: 10, color: Colors.grey.shade600),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
                   ],
                 ),

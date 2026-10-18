@@ -82,19 +82,20 @@ router.post('/', protect, async (req, res) => {
             const weightInKg = getPackSizeInKg(product.packSize);
             const qtyInKg = item.quantity * weightInKg;
 
-            masterProduct.totalStockKg -= qtyInKg;
-            await masterProduct.save({ session });
+            // Note: In the two-pool inventory architecture, bulk powder is deducted
+            // during packaging allocation. Selling packets deducts from retail stock
+            // (product.remainingStock), and does not double-deduct from loose bulk powder.
 
-            // Create inventory log
+            // Create inventory log for sales audit trail
             const logId = `${sale._id}_${item.productId}`;
             const log = new InventoryLog({
               _id: logId,
-              productId: masterProduct._id,
-              productName: masterProduct.name,
-              changeQuantity: -qtyInKg,
+              productId: product._id.toString(),
+              productName: `${masterProduct.name} (${product.packSize})`,
+              changeQuantity: -item.quantity,
               type: 'Sale Deduction',
               dateTime: sale.dateTime,
-              notes: `Invoice: ${sale.invoiceNumber} (${item.quantity}x ${product.packSize})`,
+              notes: `Invoice: ${sale.invoiceNumber} (${item.quantity}x ${product.packSize} = ${qtyInKg.toFixed(2)} kg)`,
             });
             await log.save({ session });
           }
