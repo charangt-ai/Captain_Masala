@@ -721,9 +721,10 @@ class DatabaseService extends ChangeNotifier {
     List<Map<String, dynamic>> allocations,
   ) async {
     try {
+      final headers = await _getHeaders();
       final res = await http.post(
         Uri.parse('${ApiConfig.baseUrl}/master-products/$masterId/allocate-to-packets'),
-        headers: await _getHeaders(),
+        headers: headers,
         body: json.encode({'allocations': allocations}),
       );
       if (res.statusCode == 200) {
@@ -733,9 +734,66 @@ class DatabaseService extends ChangeNotifier {
         notifyListeners();
         return true;
       }
+
+      // Fallback: If the dedicated endpoint is 404 (Render deployment in progress or pending),
+      // update bulk stock and retail products via core endpoints.
+      if (res.statusCode == 404) {
+        debugPrint('Direct allocate endpoint 404, falling back to core inventory update endpoints');
+        final master = _masterProducts.firstWhere(
+          (m) => m.id == masterId,
+          orElse: () => MasterProduct(id: masterId, name: '', totalStockKg: 0),
+        );
+
+        double totalKgToDeduct = 0.0;
+        for (var a in allocations) {
+          totalKgToDeduct += (a['allocatedKg'] as num?)?.toDouble() ?? 0.0;
+        }
+
+        final double newBulkStock = (master.totalStockKg - totalKgToDeduct).clamp(0.0, double.infinity);
+
+        // 1. Update Master Product bulk stock
+        await http.put(
+          Uri.parse('${ApiConfig.baseUrl}/master-products/$masterId'),
+          headers: headers,
+          body: json.encode({'totalStockKg': newBulkStock}),
+        );
+
+        // 2. Update each variant product packet count
+        for (var a in allocations) {
+          final String prodId = a['productId'];
+          final int newPackets = (a['packetCount'] as num?)?.toInt() ?? 0;
+          if (newPackets <= 0) continue;
+
+          Product? prod;
+          try {
+            prod = _products.firstWhere((p) => p.id == prodId);
+          } catch (_) {}
+
+          final double currentStock = prod?.remainingStock ?? 0.0;
+          final double updatedStock = currentStock + newPackets;
+
+          // Update via PUT /api/inventory-logs/stock/:id so inventory log is created
+          await http.put(
+            Uri.parse('${ApiConfig.baseUrl}/inventory-logs/stock/$prodId'),
+            headers: headers,
+            body: json.encode({
+              'newOpeningStock': updatedStock,
+              'notes': 'Direct packet allocation: +$newPackets packets (${a['allocatedKg']} kg) from ${master.name}',
+            }),
+          );
+        }
+
+        await _fetchMasterProducts();
+        await _fetchProducts();
+        await _fetchLogs(reset: true);
+        notifyListeners();
+        return true;
+      }
+
+      debugPrint('Failed to allocate packets, status: ${res.statusCode}, body: ${res.body}');
       return false;
     } catch (e) {
-      print('Error allocating master product to packets: $e');
+      debugPrint('Error allocating master product to packets: $e');
       return false;
     }
   }
