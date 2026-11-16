@@ -8,6 +8,8 @@ class RawMaterial {
   final double? gst;
   final double minimumStockLevel;
   final double currentStock;
+  final double costPerUnit;
+  final double totalCost;
   final bool isActive;
   final String? imageUrl;
 
@@ -19,6 +21,8 @@ class RawMaterial {
     this.gst,
     required this.minimumStockLevel,
     this.currentStock = 0.0,
+    this.costPerUnit = 0.0,
+    this.totalCost = 0.0,
     this.isActive = true,
     this.imageUrl,
   });
@@ -31,6 +35,8 @@ class RawMaterial {
     double? gst,
     double? minimumStockLevel,
     double? currentStock,
+    double? costPerUnit,
+    double? totalCost,
     bool? isActive,
     String? imageUrl,
   }) {
@@ -42,6 +48,8 @@ class RawMaterial {
       gst: gst ?? this.gst,
       minimumStockLevel: minimumStockLevel ?? this.minimumStockLevel,
       currentStock: currentStock ?? this.currentStock,
+      costPerUnit: costPerUnit ?? this.costPerUnit,
+      totalCost: totalCost ?? this.totalCost,
       isActive: isActive ?? this.isActive,
       imageUrl: imageUrl ?? this.imageUrl,
     );
@@ -56,6 +64,8 @@ class RawMaterial {
       'gst': gst,
       'minimumStockLevel': minimumStockLevel,
       'currentStock': currentStock,
+      'costPerUnit': costPerUnit,
+      'totalCost': totalCost,
       'isActive': isActive,
       'imageUrl': imageUrl,
     };
@@ -70,6 +80,8 @@ class RawMaterial {
       gst: map['gst']?.toDouble(),
       minimumStockLevel: map['minimumStockLevel']?.toDouble() ?? 0.0,
       currentStock: map['currentStock']?.toDouble() ?? 0.0,
+      costPerUnit: (map['costPerUnit'] ?? map['unitPrice'] ?? 0.0).toDouble(),
+      totalCost: (map['totalCost'] ?? 0.0).toDouble(),
       isActive: map['isActive'] ?? true,
       imageUrl: map['imageUrl'],
     );

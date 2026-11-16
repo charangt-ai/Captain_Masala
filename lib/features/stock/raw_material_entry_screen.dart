@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -16,6 +17,7 @@ class _RawMaterialEntryScreenState extends State<RawMaterialEntryScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _stockController = TextEditingController();
+  final _priceController = TextEditingController();
   final _gstController = TextEditingController();
   final _supplierController = TextEditingController();
   
@@ -30,11 +32,28 @@ class _RawMaterialEntryScreenState extends State<RawMaterialEntryScreen> {
     if (widget.initialData != null) {
       _nameController.text = widget.initialData!['name'] ?? '';
       _stockController.text = (widget.initialData!['currentStock']?.toString() ?? '0');
+      _priceController.text = (widget.initialData!['costPerUnit']?.toString() ?? widget.initialData!['unitPrice']?.toString() ?? '');
       _gstController.text = (widget.initialData!['gst']?.toString() ?? '0');
       _supplierController.text = widget.initialData!['supplierName'] ?? '';
       _selectedUnit = widget.initialData!['unit'] ?? 'kg';
     }
+
+    _stockController.addListener(_onFieldChanged);
+    _priceController.addListener(_onFieldChanged);
+    _gstController.addListener(_onFieldChanged);
   }
+
+  void _onFieldChanged() {
+    setState(() {});
+  }
+
+  double get _quantity => double.tryParse(_stockController.text.trim()) ?? 0.0;
+  double get _unitPrice => double.tryParse(_priceController.text.trim()) ?? 0.0;
+  double get _gstRate => double.tryParse(_gstController.text.trim()) ?? 0.0;
+
+  double get _subtotal => _quantity * _unitPrice;
+  double get _taxAmount => _subtotal * (_gstRate / 100);
+  double get _totalEstimatedCost => _subtotal + _taxAmount;
 
   Future<void> _submitStock() async {
     if (!_formKey.currentState!.validate()) return;
@@ -52,6 +71,16 @@ class _RawMaterialEntryScreenState extends State<RawMaterialEntryScreen> {
           ? '${ApiConfig.baseUrl}/inventory/raw-materials/${widget.initialData!['_id']}'
           : '${ApiConfig.baseUrl}/inventory/raw-materials';
 
+      final requestBody = {
+        'name': _nameController.text.trim(),
+        'currentStock': _quantity,
+        'unit': _selectedUnit,
+        'costPerUnit': _unitPrice,
+        'totalCost': _subtotal,
+        'gst': _gstRate,
+        'supplierName': _supplierController.text.trim(),
+      };
+
       final request = isEdit 
           ? http.put(
               Uri.parse(url),
@@ -59,13 +88,7 @@ class _RawMaterialEntryScreenState extends State<RawMaterialEntryScreen> {
                 'Content-Type': 'application/json',
                 if (token != null) 'Authorization': 'Bearer $token',
               },
-              body: json.encode({
-                'name': _nameController.text.trim(),
-                'currentStock': double.parse(_stockController.text),
-                'unit': _selectedUnit,
-                'gst': _gstController.text.isNotEmpty ? double.parse(_gstController.text) : 0,
-                'supplierName': _supplierController.text.trim(),
-              }),
+              body: json.encode(requestBody),
             )
           : http.post(
               Uri.parse(url),
@@ -73,18 +96,13 @@ class _RawMaterialEntryScreenState extends State<RawMaterialEntryScreen> {
                 'Content-Type': 'application/json',
                 if (token != null) 'Authorization': 'Bearer $token',
               },
-              body: json.encode({
-                'name': _nameController.text.trim(),
-                'currentStock': double.parse(_stockController.text),
-                'unit': _selectedUnit,
-                'gst': _gstController.text.isNotEmpty ? double.parse(_gstController.text) : 0,
-                'supplierName': _supplierController.text.trim(),
-              }),
+              body: json.encode(requestBody),
             );
 
       final response = await request;
 
       if (response.statusCode == 201 || response.statusCode == 200) {
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(isEdit ? 'Raw Material updated successfully!' : 'Raw Material stock saved successfully!')),
         );
@@ -92,30 +110,43 @@ class _RawMaterialEntryScreenState extends State<RawMaterialEntryScreen> {
           Navigator.pop(context);
         } else {
           _formKey.currentState!.reset();
+          _nameController.clear();
+          _stockController.clear();
+          _priceController.clear();
+          _gstController.clear();
+          _supplierController.clear();
           setState(() {
             _selectedUnit = 'kg';
           });
         }
       } else {
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Failed to save stock: ${response.body}')),
         );
       }
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error: $e')),
       );
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
   @override
   void dispose() {
+    _stockController.removeListener(_onFieldChanged);
+    _priceController.removeListener(_onFieldChanged);
+    _gstController.removeListener(_onFieldChanged);
     _nameController.dispose();
     _stockController.dispose();
+    _priceController.dispose();
     _gstController.dispose();
     _supplierController.dispose();
     super.dispose();
@@ -153,7 +184,7 @@ class _RawMaterialEntryScreenState extends State<RawMaterialEntryScreen> {
                       border: OutlineInputBorder(),
                     ),
                     validator: (value) => 
-                        value == null || value.isEmpty ? 'Please enter a name' : null,
+                        value == null || value.trim().isEmpty ? 'Please enter a name' : null,
                   ),
                   const SizedBox(height: 16),
 
@@ -164,13 +195,16 @@ class _RawMaterialEntryScreenState extends State<RawMaterialEntryScreen> {
                         flex: 2,
                         child: TextFormField(
                           controller: _stockController,
-                          keyboardType: TextInputType.number,
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          inputFormatters: [
+                            FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
+                          ],
                           decoration: const InputDecoration(
                             labelText: 'Initial Stock',
                             border: OutlineInputBorder(),
                           ),
                           validator: (value) => 
-                              value == null || value.isEmpty ? 'Required' : null,
+                              value == null || value.trim().isEmpty ? 'Required' : null,
                         ),
                       ),
                       const SizedBox(width: 16),
@@ -199,10 +233,29 @@ class _RawMaterialEntryScreenState extends State<RawMaterialEntryScreen> {
                   ),
                   const SizedBox(height: 16),
 
+                  // Purchase Price / Unit Cost
+                  TextFormField(
+                    controller: _priceController,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
+                    ],
+                    decoration: InputDecoration(
+                      labelText: 'Price per Unit (₹/$_selectedUnit)',
+                      prefixText: '₹ ',
+                      border: const OutlineInputBorder(),
+                      helperText: 'Purchase price per $_selectedUnit (Optional/Default ₹0)',
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
                   // GST
                   TextFormField(
                     controller: _gstController,
-                    keyboardType: TextInputType.number,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
+                    ],
                     decoration: const InputDecoration(
                       labelText: 'GST % (Optional)',
                       border: OutlineInputBorder(),
@@ -219,6 +272,56 @@ class _RawMaterialEntryScreenState extends State<RawMaterialEntryScreen> {
                       border: OutlineInputBorder(),
                     ),
                   ),
+                  const SizedBox(height: 16),
+
+                  // Live calculation preview card
+                  if (_unitPrice > 0 || _quantity > 0)
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.blueGrey.shade50,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.blueGrey.shade200),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Cost Preview',
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.blueGrey),
+                          ),
+                          const Divider(height: 12),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text('Subtotal (${_quantity.toStringAsFixed(1)} $_selectedUnit × ₹${_unitPrice.toStringAsFixed(2)}):'),
+                              Text('₹${_subtotal.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.w600)),
+                            ],
+                          ),
+                          if (_gstRate > 0) ...[
+                            const SizedBox(height: 4),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text('Tax (GST ${_gstRate.toStringAsFixed(1)}%):'),
+                                Text('+ ₹${_taxAmount.toStringAsFixed(2)}', style: const TextStyle(color: Colors.black87)),
+                              ],
+                            ),
+                          ],
+                          const SizedBox(height: 4),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text('Total Value:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                              Text(
+                                '₹${_totalEstimatedCost.toStringAsFixed(2)}',
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.green),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
                   const SizedBox(height: 24),
 
                   // Submit Button
@@ -226,12 +329,12 @@ class _RawMaterialEntryScreenState extends State<RawMaterialEntryScreen> {
                     onPressed: _isLoading ? null : _submitStock,
                     style: ElevatedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 16),
-                      backgroundColor: Colors.green, // Match the design "Save Initial Stock"
+                      backgroundColor: Colors.green, // Match design
                       foregroundColor: Colors.white,
                     ),
                     child: _isLoading 
                       ? const CircularProgressIndicator(color: Colors.white) 
-                      : const Text('Save Initial Stock', style: TextStyle(fontSize: 16)),
+                      : const Text('Save Initial Stock', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                   ),
                 ],
               ),

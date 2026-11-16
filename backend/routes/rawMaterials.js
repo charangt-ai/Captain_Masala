@@ -9,7 +9,20 @@ const RawMaterial = require('../models/RawMaterial');
 router.get('/', protect, async (req, res) => {
   try {
     const materials = await RawMaterial.find().sort({ name: 1 });
-    res.json({ success: true, count: materials.length, data: materials });
+    
+    // Calculate total valuation across all raw materials
+    const totalValuation = materials.reduce((acc, item) => {
+      const stock = item.currentStock || 0;
+      const price = item.costPerUnit || 0;
+      return acc + (stock * price);
+    }, 0);
+
+    res.json({
+      success: true,
+      count: materials.length,
+      totalValuation: Math.round(totalValuation * 100) / 100,
+      data: materials
+    });
   } catch (error) {
     console.error('Error fetching raw materials:', error);
     res.status(500).json({ success: false, message: 'Server error' });
@@ -21,13 +34,22 @@ router.get('/', protect, async (req, res) => {
 // @access  Private
 router.post('/', protect, async (req, res) => {
   try {
-    const { name, currentStock, unit, gst, supplierName } = req.body;
+    const { name, currentStock, unit, gst, supplierName, costPerUnit, totalCost } = req.body;
 
     let material = await RawMaterial.findOne({ name });
+    const parsedStock = Number(currentStock) || 0;
+    const parsedPrice = costPerUnit !== undefined ? Number(costPerUnit) : 0;
+    const computedTotal = totalCost !== undefined ? Number(totalCost) : (parsedStock * parsedPrice);
+
     if (material) {
-      // Update existing stock
-      material.currentStock += Number(currentStock);
-      material.gst = gst || material.gst;
+      // Update existing stock & unit price
+      material.currentStock += parsedStock;
+      if (parsedPrice > 0) {
+        material.costPerUnit = parsedPrice;
+      }
+      material.totalCost = (material.currentStock * (material.costPerUnit || 0));
+      material.unit = unit || material.unit;
+      material.gst = gst !== undefined ? Number(gst) : material.gst;
       material.supplierName = supplierName || material.supplierName;
       material.lastUpdated = Date.now();
       await material.save();
@@ -35,10 +57,12 @@ router.post('/', protect, async (req, res) => {
       // Create new
       material = new RawMaterial({
         name,
-        currentStock,
+        currentStock: parsedStock,
         unit,
-        gst,
-        supplierName
+        gst: gst !== undefined ? Number(gst) : 0,
+        supplierName,
+        costPerUnit: parsedPrice,
+        totalCost: computedTotal
       });
       await material.save();
     }
@@ -55,7 +79,7 @@ router.post('/', protect, async (req, res) => {
 // @access  Private
 router.put('/:id', protect, async (req, res) => {
   try {
-    const { name, currentStock, unit, gst, supplierName } = req.body;
+    const { name, currentStock, unit, gst, supplierName, costPerUnit, totalCost } = req.body;
     let material = await RawMaterial.findById(req.params.id);
     if (!material) {
       return res.status(404).json({ success: false, message: 'Material not found' });
@@ -66,6 +90,12 @@ router.put('/:id', protect, async (req, res) => {
     material.unit = unit || material.unit;
     material.gst = gst !== undefined ? Number(gst) : material.gst;
     material.supplierName = supplierName || material.supplierName;
+    if (costPerUnit !== undefined) {
+      material.costPerUnit = Number(costPerUnit);
+    }
+    material.totalCost = totalCost !== undefined 
+      ? Number(totalCost) 
+      : (material.currentStock * (material.costPerUnit || 0));
     material.lastUpdated = Date.now();
     
     await material.save();

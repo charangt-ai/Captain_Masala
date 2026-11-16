@@ -18,6 +18,7 @@ class _RawMaterialStockScreenState extends State<RawMaterialStockScreen> {
   List<dynamic> _inventory = [];
   bool _isLoading = true;
   String? _errorMessage;
+  double _totalInventoryValuation = 0.0;
 
   @override
   void initState() {
@@ -46,23 +47,38 @@ class _RawMaterialStockScreenState extends State<RawMaterialStockScreen> {
       if (response.statusCode == 200) {
         final decoded = json.decode(response.body);
         List<dynamic> materials = [];
+        double valuation = 0.0;
 
         if (decoded is List) {
-          // Backend returned a plain array
           materials = decoded;
+          for (var item in materials) {
+            final stock = (item['currentStock'] ?? 0.0).toDouble();
+            final price = (item['costPerUnit'] ?? item['unitPrice'] ?? 0.0).toDouble();
+            valuation += (stock * price);
+          }
         } else if (decoded is Map<String, dynamic>) {
-          // Backend returned a wrapper object — extract 'data'
+          if (decoded['totalValuation'] != null) {
+            valuation = (decoded['totalValuation'] as num).toDouble();
+          }
           final data = decoded['data'];
           if (data is List) {
             materials = data;
           } else if (data is Map) {
-            // Single item returned instead of array — wrap it
             materials = [data];
+          }
+
+          if (decoded['totalValuation'] == null) {
+            for (var item in materials) {
+              final stock = (item['currentStock'] ?? 0.0).toDouble();
+              final price = (item['costPerUnit'] ?? item['unitPrice'] ?? 0.0).toDouble();
+              valuation += (stock * price);
+            }
           }
         }
 
         setState(() {
           _inventory = materials;
+          _totalInventoryValuation = valuation;
           _isLoading = false;
         });
       } else {
@@ -101,6 +117,7 @@ class _RawMaterialStockScreenState extends State<RawMaterialStockScreen> {
                       const Icon(Icons.error_outline, size: 48, color: Colors.red),
                       const SizedBox(height: 16),
                       Text(_errorMessage!, style: const TextStyle(color: Colors.red)),
+                      const SizedBox(height: 12),
                       ElevatedButton(
                         onPressed: _fetchInventory,
                         child: const Text('Retry'),
@@ -114,12 +131,91 @@ class _RawMaterialStockScreenState extends State<RawMaterialStockScreen> {
                       onRefresh: _fetchInventory,
                       child: ListView.builder(
                         padding: const EdgeInsets.all(12),
-                        itemCount: _inventory.length,
+                        itemCount: _inventory.length + 1, // +1 for the Dashboard Valuation Header
                         itemBuilder: (context, index) {
-                          final item = _inventory[index];
+                          if (index == 0) {
+                            // Dashboard valuation summary header
+                            return Container(
+                              margin: const EdgeInsets.only(bottom: 12),
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [Colors.grey.shade900, Colors.blueGrey.shade800],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                ),
+                                borderRadius: BorderRadius.circular(12),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.08),
+                                    blurRadius: 6,
+                                    offset: const Offset(0, 3),
+                                  )
+                                ],
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      const Text(
+                                        'TOTAL STOCK VALUATION',
+                                        style: TextStyle(
+                                          color: Colors.white70,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w600,
+                                          letterSpacing: 0.8,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        '₹ ${_totalInventoryValuation.toStringAsFixed(2)}',
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 22,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withOpacity(0.15),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Column(
+                                      children: [
+                                        Text(
+                                          '${_inventory.length}',
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 18,
+                                          ),
+                                        ),
+                                        const Text(
+                                          'Materials',
+                                          style: TextStyle(
+                                            color: Colors.white70,
+                                            fontSize: 11,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }
+
+                          final item = _inventory[index - 1];
                           final name = item['name'] ?? 'Unknown';
-                          final stock = item['currentStock']?.toDouble() ?? 0.0;
+                          final stock = (item['currentStock'] ?? 0.0).toDouble();
                           final unit = item['unit'] ?? 'kg';
+                          final unitPrice = (item['costPerUnit'] ?? item['unitPrice'] ?? 0.0).toDouble();
+                          final totalItemValuation = stock * unitPrice;
                           
                           // Highlight if low stock (e.g. less than 5)
                           final isLowStock = stock < 5.0;
@@ -131,6 +227,7 @@ class _RawMaterialStockScreenState extends State<RawMaterialStockScreen> {
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: ListTile(
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                               onTap: () {
                                 Navigator.push(
                                   context,
@@ -143,6 +240,7 @@ class _RawMaterialStockScreenState extends State<RawMaterialStockScreen> {
                                 );
                               },
                               leading: CircleAvatar(
+                                radius: 24,
                                 backgroundColor: isLowStock ? Colors.red.shade100 : Colors.green.shade100,
                                 child: Icon(
                                   Icons.inventory_2,
@@ -153,7 +251,24 @@ class _RawMaterialStockScreenState extends State<RawMaterialStockScreen> {
                                 name,
                                 style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                               ),
-                              subtitle: Text('Unit: $unit'),
+                              subtitle: Padding(
+                                padding: const EdgeInsets.only(top: 4.0),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text('Unit: $unit', style: TextStyle(color: Colors.grey.shade700, fontSize: 13)),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      unitPrice > 0 ? 'Price: ₹${unitPrice.toStringAsFixed(2)}/$unit' : 'Price: Not Set',
+                                      style: TextStyle(
+                                        color: unitPrice > 0 ? Colors.blueGrey.shade800 : Colors.grey.shade500,
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
                               trailing: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
@@ -169,11 +284,23 @@ class _RawMaterialStockScreenState extends State<RawMaterialStockScreen> {
                                           color: isLowStock ? AppColors.outOfStockAlert : Colors.black87,
                                         ),
                                       ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        'Val: ₹${totalItemValuation.toStringAsFixed(2)}',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 12,
+                                          color: Colors.green.shade800,
+                                        ),
+                                      ),
                                       if (isLowStock)
-                                        const Text(
-                                          'Low Stock',
-                                          style: TextStyle(color: AppColors.outOfStockAlert, fontSize: 10),
-                                        )
+                                        const Padding(
+                                          padding: EdgeInsets.only(top: 2.0),
+                                          child: Text(
+                                            'Low Stock',
+                                            style: TextStyle(color: AppColors.outOfStockAlert, fontSize: 10, fontWeight: FontWeight.bold),
+                                          ),
+                                        ),
                                     ],
                                   ),
                                   PopupMenuButton<String>(
@@ -229,7 +356,6 @@ class _RawMaterialStockScreenState extends State<RawMaterialStockScreen> {
                     ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () async {
-          // Navigate to add stock screen, and refresh when coming back
           await Navigator.of(context).push(
             MaterialPageRoute(builder: (_) => const RawMaterialEntryScreen()),
           );
