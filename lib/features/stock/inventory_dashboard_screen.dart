@@ -113,16 +113,6 @@ class InventoryDashboardScreen extends StatelessWidget {
               ),
               _buildModernCard(
                 context,
-                title: 'Material Issue',
-                subtitle: 'Outward to milling unit',
-                icon: Icons.outbox,
-                accentColor: Colors.deepPurple.shade700,
-                onTap: () {
-                  Navigator.of(context).push(MaterialPageRoute(builder: (_) => const MaterialIssueScreen()));
-                },
-              ),
-              _buildModernCard(
-                context,
                 title: 'Manufacturing Yield',
                 subtitle: 'Roasting & grinding logs',
                 icon: Icons.factory,

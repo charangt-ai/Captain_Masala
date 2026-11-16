@@ -187,7 +187,7 @@ class _ProductionPlanListScreenState extends State<ProductionPlanListScreen> {
                                     style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
                                     child: const Text('Approve Plan', style: TextStyle(color: Colors.white)),
                                   ),
-                                ] else if (plan.status == 'MATERIALS_ISSUED') ...[
+                                ] else if (plan.status == 'APPROVED' || plan.status == 'MATERIALS_ISSUED') ...[
                                   const SizedBox(height: 16),
                                   ElevatedButton(
                                     onPressed: () {
