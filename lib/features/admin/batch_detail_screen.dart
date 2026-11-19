@@ -314,6 +314,89 @@ class _BatchDetailScreenState extends State<BatchDetailScreen> {
     );
   }
 
+  Future<void> _showReportOptionsDialog(BuildContext context, ManufacturingBatch batch) async {
+    bool includeRawMaterials = true;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (dialogCtx, setDialogState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              title: Row(
+                children: [
+                  Icon(Icons.picture_as_pdf, color: AppColors.primaryGreen, size: 28),
+                  const SizedBox(width: 8),
+                  const Text('PDF Report Options', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                ],
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Choose whether to include raw materials and financial costs in the generated batch report:',
+                    style: TextStyle(fontSize: 13, color: Colors.black87),
+                  ),
+                  const SizedBox(height: 16),
+                  RadioListTile<bool>(
+                    title: const Text('Detailed Report', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                    subtitle: const Text('Includes raw materials list, quantities, and cost breakdown', style: TextStyle(fontSize: 12)),
+                    value: true,
+                    groupValue: includeRawMaterials,
+                    activeColor: AppColors.primaryGreen,
+                    contentPadding: EdgeInsets.zero,
+                    onChanged: (val) {
+                      setDialogState(() {
+                        includeRawMaterials = val ?? true;
+                      });
+                    },
+                  ),
+                  RadioListTile<bool>(
+                    title: const Text('Operational Report', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                    subtitle: const Text('Excludes raw material details and costs (Yield & packaging only)', style: TextStyle(fontSize: 12)),
+                    value: false,
+                    groupValue: includeRawMaterials,
+                    activeColor: AppColors.primaryGreen,
+                    contentPadding: EdgeInsets.zero,
+                    onChanged: (val) {
+                      setDialogState(() {
+                        includeRawMaterials = val ?? false;
+                      });
+                    },
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(null),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton.icon(
+                  onPressed: () => Navigator.of(ctx).pop(includeRawMaterials),
+                  icon: const Icon(Icons.download, size: 18),
+                  label: const Text('Generate Report'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primaryGreen,
+                    foregroundColor: Colors.white,
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    if (confirmed != null && mounted) {
+      await BatchReportPdfGenerator.generateAndSharePdf(
+        batch,
+        allocations: _allocations,
+        includeRawMaterials: confirmed,
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final rupeeFormat = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0);
@@ -470,7 +553,7 @@ class _BatchDetailScreenState extends State<BatchDetailScreen> {
             const Text('Actions', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
             const SizedBox(height: 12),
             ElevatedButton.icon(
-              onPressed: () => BatchReportPdfGenerator.generateAndSharePdf(batch, allocations: _allocations),
+              onPressed: () => _showReportOptionsDialog(context, batch),
               icon: const Icon(Icons.picture_as_pdf),
               label: const Text('Download PDF Report'),
               style: ElevatedButton.styleFrom(

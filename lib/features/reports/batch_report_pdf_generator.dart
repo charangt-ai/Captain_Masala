@@ -8,7 +8,11 @@ import 'package:share_plus/share_plus.dart';
 import '../../core/models/manufacturing_batch.dart';
 
 class BatchReportPdfGenerator {
-  static Future<void> generateAndSharePdf(ManufacturingBatch batch, {List<dynamic> allocations = const []}) async {
+  static Future<void> generateAndSharePdf(
+    ManufacturingBatch batch, {
+    List<dynamic> allocations = const [],
+    bool includeRawMaterials = true,
+  }) async {
     final pdf = pw.Document();
 
     // Theme colors
@@ -85,7 +89,7 @@ class BatchReportPdfGenerator {
             pw.Divider(color: primaryOrange, thickness: 2),
             pw.SizedBox(height: 16),
 
-            // Product and Raw Material Info
+            // Product and Batch Overview / Raw Material Info
             pw.Row(
               crossAxisAlignment: pw.CrossAxisAlignment.start,
               children: [
@@ -117,18 +121,92 @@ class BatchReportPdfGenerator {
                     child: pw.Column(
                       crossAxisAlignment: pw.CrossAxisAlignment.start,
                       children: [
-                        pw.Text('RAW MATERIAL SUMMARY', style: pw.TextStyle(fontSize: 9, color: primaryOrange, fontWeight: pw.FontWeight.bold)),
-                        pw.SizedBox(height: 4),
                         pw.Text(
-                          'Total Cost: Rs. ${currencyFormat.format(batch.rawMaterials.isNotEmpty ? batch.rawMaterials.fold(0.0, (sum, item) => sum + (item.amount ?? 0)) : (batch.rawMaterialAmount ?? 0))}',
-                          style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold, color: tableHeaderDark),
+                          includeRawMaterials ? 'RAW MATERIAL SUMMARY' : 'PRODUCTION SUMMARY',
+                          style: pw.TextStyle(fontSize: 9, color: primaryOrange, fontWeight: pw.FontWeight.bold),
                         ),
+                        pw.SizedBox(height: 4),
+                        if (includeRawMaterials)
+                          pw.Text(
+                            'Total Cost: Rs. ${currencyFormat.format(batch.rawMaterials.isNotEmpty ? batch.rawMaterials.fold(0.0, (sum, item) => sum + (item.amount ?? 0)) : (batch.rawMaterialAmount ?? 0))}',
+                            style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold, color: tableHeaderDark),
+                          )
+                        else
+                          pw.Text(
+                            'Final Yield: ${batch.finalOutputWeight} kg (${batch.yieldPercentage.toStringAsFixed(1)}%)',
+                            style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold, color: tableHeaderDark),
+                          ),
                       ],
                     ),
                   ),
                 ),
               ]
             ),
+
+            if (includeRawMaterials && (batch.rawMaterials.isNotEmpty || batch.rawMaterialName != null)) ...[
+              pw.SizedBox(height: 20),
+              pw.Text('RAW MATERIALS & INGREDIENTS', style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold, color: tableHeaderDark)),
+              pw.SizedBox(height: 8),
+              pw.Table(
+                border: null,
+                columnWidths: {
+                  0: const pw.FixedColumnWidth(30),   // #
+                  1: const pw.FlexColumnWidth(4),     // MATERIAL NAME
+                  2: const pw.FlexColumnWidth(2),     // QTY (KG)
+                  3: const pw.FlexColumnWidth(2),     // AMOUNT
+                  4: const pw.FlexColumnWidth(2),     // GST
+                  5: const pw.FlexColumnWidth(2.5),   // TOTAL (RS.)
+                },
+                children: [
+                  pw.TableRow(
+                    decoration: pw.BoxDecoration(
+                      color: tableHeaderDark,
+                      borderRadius: const pw.BorderRadius.vertical(top: pw.Radius.circular(6)),
+                    ),
+                    children: [
+                      _buildHeaderCell('#'),
+                      _buildHeaderCell('RAW MATERIAL'),
+                      _buildHeaderCell('QTY (kg)', alignRight: true),
+                      _buildHeaderCell('AMOUNT (Rs.)', alignRight: true),
+                      _buildHeaderCell('GST', alignRight: true),
+                      _buildHeaderCell('TOTAL (Rs.)', alignRight: true),
+                    ],
+                  ),
+                  if (batch.rawMaterials.isNotEmpty)
+                    ...batch.rawMaterials.asMap().entries.map((entry) {
+                      final idx = entry.key + 1;
+                      final item = entry.value;
+                      return pw.TableRow(
+                        decoration: const pw.BoxDecoration(
+                          border: pw.Border(bottom: pw.BorderSide(color: PdfColors.grey200)),
+                        ),
+                        children: [
+                          _buildDataCell('$idx'),
+                          _buildDataCell(item.name),
+                          _buildDataCell(item.quantity.toStringAsFixed(2), alignRight: true),
+                          _buildDataCell(item.amount != null ? currencyFormat.format(item.amount!) : '-', alignRight: true),
+                          _buildDataCell(item.gstPercentage != null ? '${item.gstPercentage}%' : '0%', alignRight: true),
+                          _buildDataCell(item.amount != null ? currencyFormat.format(item.totalCost) : '-', alignRight: true),
+                        ],
+                      );
+                    }).toList()
+                  else
+                    pw.TableRow(
+                      decoration: const pw.BoxDecoration(
+                        border: pw.Border(bottom: pw.BorderSide(color: PdfColors.grey200)),
+                      ),
+                      children: [
+                        _buildDataCell('1'),
+                        _buildDataCell(batch.rawMaterialName ?? 'Raw Material'),
+                        _buildDataCell(batch.rawMaterialQuantity?.toStringAsFixed(2) ?? '0.00', alignRight: true),
+                        _buildDataCell(batch.rawMaterialAmount != null ? currencyFormat.format(batch.rawMaterialAmount!) : '-', alignRight: true),
+                        _buildDataCell(batch.gstPercentage != null ? '${batch.gstPercentage}%' : '0%', alignRight: true),
+                        _buildDataCell(currencyFormat.format((batch.rawMaterialAmount ?? 0) + batch.totalGstAmount), alignRight: true),
+                      ],
+                    ),
+                ],
+              ),
+            ],
 
             pw.SizedBox(height: 24),
 
@@ -258,7 +336,7 @@ class BatchReportPdfGenerator {
                 children: [
                   // Final Yield
                   pw.Container(
-                    width: 200,
+                    width: includeRawMaterials ? 200 : 250,
                     padding: const pw.EdgeInsets.all(16),
                     decoration: pw.BoxDecoration(
                       color: PdfColor.fromHex('#E8F5E9'), // Light Green
@@ -277,77 +355,78 @@ class BatchReportPdfGenerator {
                     ),
                   ),
 
-                  // Cost Box
-                  pw.Container(
-                    width: 250,
-                    decoration: pw.BoxDecoration(
-                      border: pw.Border.all(color: tableHeaderDark),
-                      borderRadius: pw.BorderRadius.circular(6),
-                    ),
-                    child: pw.Column(
-                      children: [
-                        pw.Container(
-                          width: double.infinity,
-                          padding: const pw.EdgeInsets.all(8),
-                          decoration: pw.BoxDecoration(
-                            color: tableHeaderDark,
-                            borderRadius: const pw.BorderRadius.vertical(top: pw.Radius.circular(5)),
+                  // Cost Box (Only included if raw materials and costs are requested)
+                  if (includeRawMaterials)
+                    pw.Container(
+                      width: 250,
+                      decoration: pw.BoxDecoration(
+                        border: pw.Border.all(color: tableHeaderDark),
+                        borderRadius: pw.BorderRadius.circular(6),
+                      ),
+                      child: pw.Column(
+                        children: [
+                          pw.Container(
+                            width: double.infinity,
+                            padding: const pw.EdgeInsets.all(8),
+                            decoration: pw.BoxDecoration(
+                              color: tableHeaderDark,
+                              borderRadius: const pw.BorderRadius.vertical(top: pw.Radius.circular(5)),
+                            ),
+                            child: pw.Text('COST SUMMARY', style: pw.TextStyle(color: PdfColors.white, fontSize: 10, fontWeight: pw.FontWeight.bold)),
                           ),
-                          child: pw.Text('COST SUMMARY', style: pw.TextStyle(color: PdfColors.white, fontSize: 10, fontWeight: pw.FontWeight.bold)),
-                        ),
-                        
-                        _buildSummaryRow(
-                          'Raw Material Amount', 
-                          currencyFormat.format(batch.rawMaterials.isNotEmpty 
-                            ? batch.rawMaterials.fold(0.0, (sum, item) => sum + (item.amount ?? 0))
-                            : (batch.rawMaterialAmount ?? 0))
-                        ),
-                        pw.Divider(height: 0, color: dividerColor),
-                        _buildSummaryRow(
-                          batch.rawMaterials.isNotEmpty 
-                            ? 'Total GST' 
-                            : 'GST (${batch.gstPercentage}%)', 
-                          currencyFormat.format(batch.totalGstAmount)
-                        ),
-                        if (batch.dryingCost > 0) ...[
+                          
+                          _buildSummaryRow(
+                            'Raw Material Amount', 
+                            currencyFormat.format(batch.rawMaterials.isNotEmpty 
+                              ? batch.rawMaterials.fold(0.0, (sum, item) => sum + (item.amount ?? 0))
+                              : (batch.rawMaterialAmount ?? 0))
+                          ),
                           pw.Divider(height: 0, color: dividerColor),
-                          _buildSummaryRow('Drying Process Cost', currencyFormat.format(batch.dryingCost)),
-                        ],
-                        if (batch.grindingCost > 0) ...[
-                          pw.Divider(height: 0, color: dividerColor),
-                          _buildSummaryRow('Grinding Process Cost', currencyFormat.format(batch.grindingCost)),
-                        ],
-                        if (batch.otherCosts.isNotEmpty)
-                          ...batch.otherCosts.map((cost) {
-                            final cName = cost['name']?.toString() ?? 'Other Cost';
-                            final cAmt = (cost['amount'] as num?)?.toDouble() ?? 0.0;
-                            return pw.Column(
+                          _buildSummaryRow(
+                            batch.rawMaterials.isNotEmpty 
+                              ? 'Total GST' 
+                              : 'GST (${batch.gstPercentage}%)', 
+                            currencyFormat.format(batch.totalGstAmount)
+                          ),
+                          if (batch.dryingCost > 0) ...[
+                            pw.Divider(height: 0, color: dividerColor),
+                            _buildSummaryRow('Drying Process Cost', currencyFormat.format(batch.dryingCost)),
+                          ],
+                          if (batch.grindingCost > 0) ...[
+                            pw.Divider(height: 0, color: dividerColor),
+                            _buildSummaryRow('Grinding Process Cost', currencyFormat.format(batch.grindingCost)),
+                          ],
+                          if (batch.otherCosts.isNotEmpty)
+                            ...batch.otherCosts.map((cost) {
+                              final cName = cost['name']?.toString() ?? 'Other Cost';
+                              final cAmt = (cost['amount'] as num?)?.toDouble() ?? 0.0;
+                              return pw.Column(
+                                children: [
+                                  pw.Divider(height: 0, color: dividerColor),
+                                  _buildSummaryRow(cName, currencyFormat.format(cAmt)),
+                                ],
+                              );
+                            }),
+                          
+                          pw.Container(
+                            width: double.infinity,
+                            padding: const pw.EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            decoration: pw.BoxDecoration(
+                              color: tableHeaderDark,
+                              borderRadius: const pw.BorderRadius.vertical(bottom: pw.Radius.circular(5)),
+                            ),
+                            child: pw.Row(
+                              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                               children: [
-                                pw.Divider(height: 0, color: dividerColor),
-                                _buildSummaryRow(cName, currencyFormat.format(cAmt)),
+                                pw.Text('TOTAL COST', style: pw.TextStyle(color: PdfColors.white, fontSize: 11, fontWeight: pw.FontWeight.bold)),
+                                pw.Text('Rs. ${currencyFormat.format(batch.totalCost)}', 
+                                  style: pw.TextStyle(color: PdfColor.fromHex('#EF5350'), fontSize: 14, fontWeight: pw.FontWeight.bold)),
                               ],
-                            );
-                          }),
-                        
-                        pw.Container(
-                          width: double.infinity,
-                          padding: const pw.EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                          decoration: pw.BoxDecoration(
-                            color: tableHeaderDark,
-                            borderRadius: const pw.BorderRadius.vertical(bottom: pw.Radius.circular(5)),
+                            ),
                           ),
-                          child: pw.Row(
-                            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                            children: [
-                              pw.Text('TOTAL COST', style: pw.TextStyle(color: PdfColors.white, fontSize: 11, fontWeight: pw.FontWeight.bold)),
-                              pw.Text('Rs. ${currencyFormat.format(batch.totalCost)}', 
-                                style: pw.TextStyle(color: PdfColor.fromHex('#EF5350'), fontSize: 14, fontWeight: pw.FontWeight.bold)),
-                            ],
-                          ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
                 ],
               ),
 
