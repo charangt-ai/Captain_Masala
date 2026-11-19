@@ -400,7 +400,7 @@ class _BatchDetailScreenState extends State<BatchDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final rupeeFormat = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0);
-    final isSuperAdmin = Permissions.isSuperAdmin(widget.dbService.currentUserProfile?.role);
+    final isSuperAdmin = Permissions.isAdmin(widget.dbService.currentUserProfile?.role);
 
     return Scaffold(
       appBar: AppBar(

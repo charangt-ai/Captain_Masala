@@ -2,8 +2,8 @@ class Permissions {
   static bool isSuperAdmin(String? role) => role == 'super_admin';
   static bool isAdmin(String? role) => role == 'super_admin' || role == 'admin';
   
-  static bool canManageInventory(String? role) => role == 'super_admin';
-  static bool canManageProduction(String? role) => role == 'super_admin';
+  static bool canManageInventory(String? role) => role == 'super_admin' || role == 'admin';
+  static bool canManageProduction(String? role) => role == 'super_admin' || role == 'admin';
   static bool canViewAllSales(String? role) => role == 'super_admin' || role == 'admin';
   static bool canViewReports(String? role) => role == 'super_admin' || role == 'admin';
   
@@ -14,6 +14,6 @@ class Permissions {
   static bool canUpdateDeliveryStatus(String? role) => 
       role == 'super_admin' || role == 'admin' || role == 'seller' || role == 'delivery';
       
-  static bool canEditOrder(String? role) => role == 'super_admin';
+  static bool canEditOrder(String? role) => role == 'super_admin' || role == 'admin';
   static bool canManageUsers(String? role) => role == 'super_admin';
 }

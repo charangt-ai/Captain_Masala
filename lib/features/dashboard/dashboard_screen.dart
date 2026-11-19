@@ -388,11 +388,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
             scrollDirection: Axis.horizontal,
             child: Row(
               children: [
-                if (Permissions.isSuperAdmin(db.currentUserProfile?.role))
+                if (Permissions.isAdmin(db.currentUserProfile?.role))
                   _buildActionButton(context, Icons.factory, 'Inventory & Production', () {
                     Navigator.of(context).push(MaterialPageRoute(builder: (_) => const InventoryDashboardScreen()));
                   }),
-                if (Permissions.isSuperAdmin(db.currentUserProfile?.role))
+                if (Permissions.isAdmin(db.currentUserProfile?.role))
                   _buildActionButton(context, Icons.security, 'Manage Sellers', () {
                     Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ManageUsersScreen()));
                   }),
