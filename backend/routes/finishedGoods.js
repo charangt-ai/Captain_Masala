@@ -106,8 +106,8 @@ router.put('/:id/status', protect, async (req, res) => {
     const batch = await FinishedGoodsBatch.findById(req.params.id);
     if (!batch) return res.status(404).json({ success: false, message: 'Batch not found' });
 
-    // If deleting/depleting, rollback master product stock
-    if ((status === 'DEPLETED' || status === 'RECALLED') && batch.currentQuantity > 0 && batch.masterProductId) {
+    // If deleting/depleting/recalled, rollback master product stock
+    if ((status === 'DEPLETED' || status === 'RECALLED' || status === 'DELETED') && batch.currentQuantity > 0 && batch.masterProductId) {
       const masterProduct = await MasterProduct.findById(batch.masterProductId);
       if (masterProduct) {
         masterProduct.totalStockKg = Math.max(0, (masterProduct.totalStockKg || 0) - batch.currentQuantity);
@@ -116,22 +116,22 @@ router.put('/:id/status', protect, async (req, res) => {
       batch.currentQuantity = 0;
     }
 
+    // If deleting, permanently remove document and allocations
+    if (status === 'DELETED') {
+      try {
+        const PackagingAllocation = require('../models/PackagingAllocation');
+        await PackagingAllocation.deleteMany({ finishedGoodsBatchId: batch._id });
+      } catch (allocErr) {
+        console.error('Error deleting packaging allocations:', allocErr);
+      }
+      await FinishedGoodsBatch.findByIdAndDelete(batch._id);
+      return res.json({ success: true, message: `Batch ${batch.batchNumber} permanently deleted` });
+    }
+
     batch.status = status;
     await batch.save();
 
-    // If deleting, permanently remove
-    if (status === 'DELETED') {
-      if (batch.currentQuantity > 0 && batch.masterProductId) {
-        const masterProduct = await MasterProduct.findById(batch.masterProductId);
-        if (masterProduct) {
-          masterProduct.totalStockKg = Math.max(0, (masterProduct.totalStockKg || 0) - batch.currentQuantity);
-          await masterProduct.save();
-        }
-      }
-      await FinishedGoodsBatch.findByIdAndDelete(batch._id);
-    }
-
-    res.json({ success: true, message: 'Batch updated or removed successfully', data: batch });
+    res.json({ success: true, message: 'Batch updated successfully', data: batch });
   } catch (error) {
     console.error('Error updating FG batch status:', error);
     res.status(500).json({ success: false, message: 'Server error' });

@@ -41,15 +41,19 @@ class _FinishedGoodsScreenState extends State<FinishedGoodsScreen> with SingleTi
   }
 
   double get _totalBulkAvailableKg {
-    return _batches.fold(0.0, (sum, b) => sum + (b.currentQuantity > 0 ? b.currentQuantity : 0.0));
+    return _batches
+        .where((b) => b.status != 'DEPLETED' && b.status != 'DELETED')
+        .fold(0.0, (sum, b) => sum + (b.currentQuantity > 0 ? b.currentQuantity : 0.0));
   }
 
   int get _batchesReadyToPackCount {
-    return _batches.where((b) => b.currentQuantity > 0 && b.status != 'EXPIRED').length;
+    return _batches
+        .where((b) => b.currentQuantity > 0 && b.status != 'EXPIRED' && b.status != 'DEPLETED' && b.status != 'DELETED')
+        .length;
   }
 
   int get _depletedBatchesCount {
-    return _batches.where((b) => b.currentQuantity <= 0 || b.status == 'DEPLETED').length;
+    return _batches.where((b) => b.status != 'DELETED' && (b.currentQuantity <= 0 || b.status == 'DEPLETED')).length;
   }
 
   Color _getStatusColor(FinishedGoodsBatch batch) {
@@ -130,6 +134,10 @@ class _FinishedGoodsScreenState extends State<FinishedGoodsScreen> with SingleTi
       
       if (!mounted) return;
       if (result['success'] == true) {
+        setState(() {
+          _batches.removeWhere((b) => b.id == batch.id);
+          _isLoading = false;
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Batch ${batch.batchNumber} deleted permanently.'),
@@ -628,8 +636,14 @@ class _FinishedGoodsScreenState extends State<FinishedGoodsScreen> with SingleTi
 
   @override
   Widget build(BuildContext context) {
-    final availableBatches = _batches.where((b) => b.currentQuantity > 0 && !b.expiryDate.isBefore(DateTime.now())).toList();
-    final packedBatches = _batches.where((b) => b.currentQuantity <= 0 || b.status == 'DEPLETED').toList();
+    // Filter out permanently deleted / depleted from "Ready to Pack"
+    final activeBatches = _batches.where((b) => b.status != 'DELETED').toList();
+    final availableBatches = activeBatches
+        .where((b) => b.currentQuantity > 0 && b.status != 'DEPLETED' && !b.expiryDate.isBefore(DateTime.now()))
+        .toList();
+    final packedBatches = activeBatches
+        .where((b) => b.currentQuantity <= 0 || b.status == 'DEPLETED')
+        .toList();
 
     return Scaffold(
       backgroundColor: Colors.grey.shade100,
@@ -652,7 +666,7 @@ class _FinishedGoodsScreenState extends State<FinishedGoodsScreen> with SingleTi
           tabs: [
             Tab(text: 'Ready to Pack (${availableBatches.length})'),
             Tab(text: 'Fully Packed (${packedBatches.length})'),
-            Tab(text: 'All Batches (${_batches.length})'),
+            Tab(text: 'All Batches (${activeBatches.length})'),
           ],
         ),
       ),
@@ -679,7 +693,7 @@ class _FinishedGoodsScreenState extends State<FinishedGoodsScreen> with SingleTi
                       ),
                       // Tab 3: All
                       _buildBatchList(
-                        _batches,
+                        activeBatches,
                         emptyMessage: 'No finished goods batches found in the database.',
                         emptyIcon: Icons.inbox_outlined,
                       ),

@@ -1266,11 +1266,11 @@ class DatabaseService extends ChangeNotifier {
       }
 
       // 2. Resilient fallback: If server returns 404 (Render hasn't mounted DELETE route),
-      // update status to DEPLETED / DELETED via the existing PUT /status route
+      // update status to DELETED via the existing PUT /status route
       final putRes = await http.put(
         Uri.parse('${ApiConfig.baseUrl}/finished-goods/$fgBatchId/status'),
         headers: await _getHeaders(),
-        body: json.encode({'status': 'DEPLETED'}),
+        body: json.encode({'status': 'DELETED'}),
       );
       if (putRes.statusCode == 200) {
         return {'success': true};
