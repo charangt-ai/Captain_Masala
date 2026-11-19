@@ -1254,6 +1254,23 @@ class DatabaseService extends ChangeNotifier {
     }
   }
 
+  Future<bool> deleteFinishedGoodsBatch(String fgBatchId) async {
+    try {
+      final res = await http.delete(
+        Uri.parse('${ApiConfig.baseUrl}/finished-goods/$fgBatchId'),
+        headers: await _getHeaders(),
+      );
+      if (res.statusCode == 200) {
+        return true;
+      }
+      debugPrint('Failed to delete FG batch: ${res.statusCode} ${res.body}');
+      return false;
+    } catch (e) {
+      debugPrint('Error deleting finished goods batch: $e');
+      return false;
+    }
+  }
+
   Future<List<dynamic>> fetchAllocationsByFgBatch(String fgBatchId) async {
     try {
       final res = await http.get(

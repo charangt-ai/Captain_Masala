@@ -78,6 +78,77 @@ class _FinishedGoodsScreenState extends State<FinishedGoodsScreen> with SingleTi
     return 'READY TO PACK';
   }
 
+  Future<void> _deleteBatch(FinishedGoodsBatch batch) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.delete_forever, color: Colors.red),
+            SizedBox(width: 8),
+            Text('Delete Batch?'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Are you sure you want to permanently delete batch ${batch.batchNumber} (${batch.masterProductName})?',
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 12),
+            if (batch.currentQuantity > 0)
+              Text(
+                '• ${batch.currentQuantity.toStringAsFixed(1)} kg bulk powder will be written off from inventory.',
+                style: const TextStyle(color: Colors.red, fontSize: 13),
+              ),
+            const Text(
+              '• This action cannot be undone.',
+              style: TextStyle(color: Colors.grey, fontSize: 12),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Delete Permanently', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && batch.id != null) {
+      setState(() => _isLoading = true);
+      final db = Provider.of<DatabaseService>(context, listen: false);
+      final success = await db.deleteFinishedGoodsBatch(batch.id!);
+      
+      if (!mounted) return;
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Batch ${batch.batchNumber} deleted permanently.'),
+            backgroundColor: Colors.green[800],
+          ),
+        );
+        _loadBatches();
+      } else {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to delete batch. Please try again.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   void _showPackagingHistoryModal(FinishedGoodsBatch batch) async {
     showModalBottomSheet(
       context: context,
@@ -391,6 +462,40 @@ class _FinishedGoodsScreenState extends State<FinishedGoodsScreen> with SingleTi
                     backgroundColor: _getStatusColor(batch),
                     padding: const EdgeInsets.symmetric(horizontal: 4),
                     materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  const SizedBox(width: 4),
+                  PopupMenuButton<String>(
+                    icon: const Icon(Icons.more_vert, size: 20, color: Colors.grey),
+                    padding: EdgeInsets.zero,
+                    onSelected: (val) {
+                      if (val == 'history') {
+                        _showPackagingHistoryModal(batch);
+                      } else if (val == 'delete') {
+                        _deleteBatch(batch);
+                      }
+                    },
+                    itemBuilder: (ctx) => [
+                      const PopupMenuItem(
+                        value: 'history',
+                        child: Row(
+                          children: [
+                            Icon(Icons.history, size: 18, color: Colors.indigo),
+                            SizedBox(width: 8),
+                            Text('Packaging History'),
+                          ],
+                        ),
+                      ),
+                      const PopupMenuItem(
+                        value: 'delete',
+                        child: Row(
+                          children: [
+                            Icon(Icons.delete_forever, size: 18, color: Colors.red),
+                            SizedBox(width: 8),
+                            Text('Delete Permanently', style: TextStyle(color: Colors.red)),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
