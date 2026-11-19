@@ -258,6 +258,7 @@ class _QualityControlScreenState extends State<QualityControlScreen> {
                     ),
                   ] else ...[
                     DropdownButtonFormField<String>(
+                      isExpanded: true,
                       decoration: const InputDecoration(
                         labelText: 'Select Production Plan for QC',
                         border: OutlineInputBorder(),
@@ -270,6 +271,7 @@ class _QualityControlScreenState extends State<QualityControlScreen> {
                           child: Text(
                             '${p.planNumber} - ${p.masterProductName} (${p.status})',
                             overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
                           ),
                         );
                       }).toList(),
@@ -289,18 +291,23 @@ class _QualityControlScreenState extends State<QualityControlScreen> {
                                 child: Padding(
                                   padding: const EdgeInsets.all(12.0),
                                   child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                     children: [
-                                      Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            _selectedPlan!.masterProductName,
-                                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                                          ),
-                                          Text('Plan Size: ${_selectedPlan!.plannedBatchSize} kg'),
-                                        ],
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              _selectedPlan!.masterProductName,
+                                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                              overflow: TextOverflow.ellipsis,
+                                              maxLines: 1,
+                                            ),
+                                            const SizedBox(height: 2),
+                                            Text('Plan Size: ${_selectedPlan!.plannedBatchSize} kg'),
+                                          ],
+                                        ),
                                       ),
+                                      const SizedBox(width: 8),
                                       Chip(
                                         label: Text(
                                           _selectedPlan!.status,
@@ -314,42 +321,75 @@ class _QualityControlScreenState extends State<QualityControlScreen> {
                               ),
                               const SizedBox(height: 16),
 
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: TextFormField(
-                                      controller: _batchWeightController,
-                                      decoration: const InputDecoration(
-                                        labelText: 'Final Batch Weight (kg)',
-                                        border: OutlineInputBorder(),
-                                        suffixText: 'kg',
+                              LayoutBuilder(
+                                builder: (context, constraints) {
+                                  if (constraints.maxWidth < 340) {
+                                    return Column(
+                                      children: [
+                                        TextFormField(
+                                          controller: _batchWeightController,
+                                          decoration: const InputDecoration(
+                                            labelText: 'Final Batch Weight (kg)',
+                                            border: OutlineInputBorder(),
+                                            suffixText: 'kg',
+                                          ),
+                                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                        ),
+                                        const SizedBox(height: 12),
+                                        TextFormField(
+                                          controller: _sampleSizeController,
+                                          decoration: const InputDecoration(
+                                            labelText: 'Sample Size (g)',
+                                            border: OutlineInputBorder(),
+                                            suffixText: 'g',
+                                          ),
+                                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                        ),
+                                      ],
+                                    );
+                                  }
+                                  return Row(
+                                    children: [
+                                      Expanded(
+                                        child: TextFormField(
+                                          controller: _batchWeightController,
+                                          decoration: const InputDecoration(
+                                            labelText: 'Final Batch Weight (kg)',
+                                            border: OutlineInputBorder(),
+                                            suffixText: 'kg',
+                                          ),
+                                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                        ),
                                       ),
-                                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 16),
-                                  Expanded(
-                                    child: TextFormField(
-                                      controller: _sampleSizeController,
-                                      decoration: const InputDecoration(
-                                        labelText: 'Sample Size (g)',
-                                        border: OutlineInputBorder(),
-                                        suffixText: 'g',
+                                      const SizedBox(width: 16),
+                                      Expanded(
+                                        child: TextFormField(
+                                          controller: _sampleSizeController,
+                                          decoration: const InputDecoration(
+                                            labelText: 'Sample Size (g)',
+                                            border: OutlineInputBorder(),
+                                            suffixText: 'g',
+                                          ),
+                                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                        ),
                                       ),
-                                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                    ),
-                                  ),
-                                ],
+                                    ],
+                                  );
+                                },
                               ),
                               const SizedBox(height: 24),
 
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
-                                  const Text(
-                                    'QC Laboratory Parameters',
-                                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                                  const Expanded(
+                                    child: Text(
+                                      'QC Laboratory Parameters',
+                                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
                                   ),
+                                  const SizedBox(width: 8),
                                   Text(
                                     '${_qcParameters.where((p) => p['isPassed'] == true).length}/${_qcParameters.length} Passed',
                                     style: TextStyle(
@@ -371,11 +411,12 @@ class _QualityControlScreenState extends State<QualityControlScreen> {
                                     borderRadius: BorderRadius.circular(8),
                                   ),
                                   child: Padding(
-                                    padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
+                                    padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 8.0),
                                     child: Row(
+                                      crossAxisAlignment: CrossAxisAlignment.center,
                                       children: [
                                         Expanded(
-                                          flex: 3,
+                                          flex: 5,
                                           child: Column(
                                             crossAxisAlignment: CrossAxisAlignment.start,
                                             children: [
@@ -383,15 +424,19 @@ class _QualityControlScreenState extends State<QualityControlScreen> {
                                                 param['name'],
                                                 style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                                               ),
+                                              const SizedBox(height: 2),
                                               Text(
-                                                'Standard: ${param['expected']}',
-                                                style: TextStyle(fontSize: 12, color: Colors.grey[700]),
+                                                'Std: ${param['expected']}',
+                                                style: TextStyle(fontSize: 11, color: Colors.grey[700]),
+                                                maxLines: 2,
+                                                overflow: TextOverflow.ellipsis,
                                               ),
                                             ],
                                           ),
                                         ),
+                                        const SizedBox(width: 6),
                                         Expanded(
-                                          flex: 3,
+                                          flex: 4,
                                           child: TextFormField(
                                             controller: _actualValueControllers[param['name']],
                                             decoration: const InputDecoration(
@@ -400,30 +445,44 @@ class _QualityControlScreenState extends State<QualityControlScreen> {
                                               contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
                                               border: OutlineInputBorder(),
                                             ),
-                                            style: const TextStyle(fontSize: 13),
+                                            style: const TextStyle(fontSize: 12),
                                           ),
                                         ),
-                                        const SizedBox(width: 8),
-                                        Column(
-                                          children: [
-                                            Checkbox(
-                                              value: param['isPassed'],
-                                              activeColor: Colors.green[800],
-                                              onChanged: (val) {
-                                                setState(() {
-                                                  param['isPassed'] = val ?? false;
-                                                });
-                                              },
+                                        const SizedBox(width: 4),
+                                        InkWell(
+                                          borderRadius: BorderRadius.circular(4),
+                                          onTap: () {
+                                            setState(() {
+                                              param['isPassed'] = !(param['isPassed'] == true);
+                                            });
+                                          },
+                                          child: Padding(
+                                            padding: const EdgeInsets.symmetric(horizontal: 4.0, vertical: 2.0),
+                                            child: Column(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Checkbox(
+                                                  value: param['isPassed'],
+                                                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                                  visualDensity: VisualDensity.compact,
+                                                  activeColor: Colors.green[800],
+                                                  onChanged: (val) {
+                                                    setState(() {
+                                                      param['isPassed'] = val ?? false;
+                                                    });
+                                                  },
+                                                ),
+                                                Text(
+                                                  isPassed ? 'Pass' : 'Fail',
+                                                  style: TextStyle(
+                                                    fontSize: 10,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: isPassed ? Colors.green[800] : Colors.red[800],
+                                                  ),
+                                                )
+                                              ],
                                             ),
-                                            Text(
-                                              isPassed ? 'Pass' : 'Fail',
-                                              style: TextStyle(
-                                                fontSize: 10,
-                                                fontWeight: FontWeight.bold,
-                                                color: isPassed ? Colors.green[800] : Colors.red[800],
-                                              ),
-                                            )
-                                          ],
+                                          ),
                                         ),
                                       ],
                                     ),
@@ -433,16 +492,17 @@ class _QualityControlScreenState extends State<QualityControlScreen> {
 
                               const SizedBox(height: 24),
                               DropdownButtonFormField<String>(
+                                isExpanded: true,
                                 decoration: const InputDecoration(
                                   labelText: 'Overall Result Decision',
                                   border: OutlineInputBorder(),
                                 ),
                                 value: _overallResult,
                                 items: const [
-                                  DropdownMenuItem(value: 'PASSED', child: Text('PASSED (Approve for Packaging)')),
-                                  DropdownMenuItem(value: 'CONDITIONAL_PASS', child: Text('CONDITIONAL PASS')),
-                                  DropdownMenuItem(value: 'FAILED', child: Text('FAILED (Reject Batch)')),
-                                  DropdownMenuItem(value: 'PENDING', child: Text('PENDING INSPECTION')),
+                                  DropdownMenuItem(value: 'PASSED', child: Text('PASSED (Approve for Packaging)', overflow: TextOverflow.ellipsis)),
+                                  DropdownMenuItem(value: 'CONDITIONAL_PASS', child: Text('CONDITIONAL PASS', overflow: TextOverflow.ellipsis)),
+                                  DropdownMenuItem(value: 'FAILED', child: Text('FAILED (Reject Batch)', overflow: TextOverflow.ellipsis)),
+                                  DropdownMenuItem(value: 'PENDING', child: Text('PENDING INSPECTION', overflow: TextOverflow.ellipsis)),
                                 ],
                                 onChanged: (val) {
                                   setState(() {
