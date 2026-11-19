@@ -65,8 +65,19 @@ router.post('/', protect, admin, async (req, res) => {
       batch.finalOutputWeight = parsedBatchWeight;
     }
 
-    const count = await QualityControl.countDocuments();
-    const qcNumber = `QC-${new Date().getFullYear()}-${(count + 1).toString().padStart(3, '0')}`;
+    const year = new Date().getFullYear();
+    const qcPrefix = `QC-${year}-`;
+    const latestQc = await QualityControl.findOne({ qcNumber: new RegExp(`^${qcPrefix}`) })
+      .sort({ qcNumber: -1 })
+      .session(session);
+
+    let nextQcSeq = 1;
+    if (latestQc && latestQc.qcNumber) {
+      const parts = latestQc.qcNumber.split('-');
+      const lastNum = parseInt(parts[parts.length - 1], 10);
+      if (!isNaN(lastNum)) nextQcSeq = lastNum + 1;
+    }
+    const qcNumber = `${qcPrefix}${nextQcSeq.toString().padStart(3, '0')}`;
 
     const qc = new QualityControl({
       qcNumber,
@@ -93,8 +104,18 @@ router.post('/', protect, admin, async (req, res) => {
       const masterProduct = await MasterProduct.findById(plan.masterProductId).session(session);
       if (!masterProduct) throw new Error('Master product not found');
 
-      const fgCount = await FinishedGoodsBatch.countDocuments();
-      const fgBatchNumber = `FG-CM-${new Date().getFullYear()}-${(fgCount + 1).toString().padStart(4, '0')}`;
+      const fgPrefix = `FG-CM-${year}-`;
+      const latestFg = await FinishedGoodsBatch.findOne({ batchNumber: new RegExp(`^${fgPrefix}`) })
+        .sort({ batchNumber: -1 })
+        .session(session);
+
+      let nextFgSeq = 1;
+      if (latestFg && latestFg.batchNumber) {
+        const parts = latestFg.batchNumber.split('-');
+        const lastNum = parseInt(parts[parts.length - 1], 10);
+        if (!isNaN(lastNum)) nextFgSeq = lastNum + 1;
+      }
+      const fgBatchNumber = `${fgPrefix}${nextFgSeq.toString().padStart(4, '0')}`;
 
       const fgBatch = new FinishedGoodsBatch({
         batchNumber: fgBatchNumber,

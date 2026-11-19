@@ -25,8 +25,19 @@ router.post('/', protect, superAdmin, async (req, res) => {
     const masterProduct = await MasterProduct.findById(plan.masterProductId).session(session);
     if (!masterProduct) throw new Error('Master product not found');
 
-    const count = await FinishedGoodsBatch.countDocuments();
-    const batchNumber = `FG-CM-${new Date().getFullYear()}-${(count + 1).toString().padStart(4, '0')}`;
+    const year = new Date().getFullYear();
+    const fgPrefix = `FG-CM-${year}-`;
+    const latestFg = await FinishedGoodsBatch.findOne({ batchNumber: new RegExp(`^${fgPrefix}`) })
+      .sort({ batchNumber: -1 })
+      .session(session);
+
+    let nextFgSeq = 1;
+    if (latestFg && latestFg.batchNumber) {
+      const parts = latestFg.batchNumber.split('-');
+      const lastNum = parseInt(parts[parts.length - 1], 10);
+      if (!isNaN(lastNum)) nextFgSeq = lastNum + 1;
+    }
+    const batchNumber = `${fgPrefix}${nextFgSeq.toString().padStart(4, '0')}`;
 
     const fgBatch = new FinishedGoodsBatch({
       batchNumber,
