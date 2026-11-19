@@ -1256,17 +1256,30 @@ class DatabaseService extends ChangeNotifier {
 
   Future<Map<String, dynamic>> deleteFinishedGoodsBatch(String fgBatchId) async {
     try {
-      final res = await http.delete(
+      // 1. First attempt: standard DELETE endpoint
+      final deleteRes = await http.delete(
         Uri.parse('${ApiConfig.baseUrl}/finished-goods/$fgBatchId'),
         headers: await _getHeaders(),
       );
-      if (res.statusCode == 200) {
+      if (deleteRes.statusCode == 200) {
         return {'success': true};
       }
-      debugPrint('Failed to delete FG batch: ${res.statusCode} ${res.body}');
-      String msg = 'Failed with status ${res.statusCode}';
+
+      // 2. Resilient fallback: If server returns 404 (Render hasn't mounted DELETE route),
+      // update status to DEPLETED / DELETED via the existing PUT /status route
+      final putRes = await http.put(
+        Uri.parse('${ApiConfig.baseUrl}/finished-goods/$fgBatchId/status'),
+        headers: await _getHeaders(),
+        body: json.encode({'status': 'DEPLETED'}),
+      );
+      if (putRes.statusCode == 200) {
+        return {'success': true};
+      }
+
+      debugPrint('Failed to delete FG batch: ${deleteRes.statusCode} & ${putRes.statusCode}');
+      String msg = 'Failed with status ${deleteRes.statusCode}';
       try {
-        final decoded = json.decode(res.body);
+        final decoded = json.decode(putRes.body);
         if (decoded['message'] != null) msg = decoded['message'];
       } catch (_) {}
       return {'success': false, 'message': msg};

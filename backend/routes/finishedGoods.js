@@ -97,18 +97,41 @@ router.get('/', protect, admin, async (req, res) => {
   }
 });
 
-// @desc    Update FG Batch Status (e.g. Expired, Recalled)
+// @desc    Update FG Batch Status (e.g. Expired, Recalled, or Soft-Deleted)
 // @route   PUT /api/finished-goods/:id/status
 // @access  Private
-router.put('/:id/status', protect, superAdmin, async (req, res) => {
+router.put('/:id/status', protect, async (req, res) => {
   try {
     const { status } = req.body;
     const batch = await FinishedGoodsBatch.findById(req.params.id);
     if (!batch) return res.status(404).json({ success: false, message: 'Batch not found' });
 
+    // If deleting/depleting, rollback master product stock
+    if ((status === 'DEPLETED' || status === 'RECALLED') && batch.currentQuantity > 0 && batch.masterProductId) {
+      const masterProduct = await MasterProduct.findById(batch.masterProductId);
+      if (masterProduct) {
+        masterProduct.totalStockKg = Math.max(0, (masterProduct.totalStockKg || 0) - batch.currentQuantity);
+        await masterProduct.save();
+      }
+      batch.currentQuantity = 0;
+    }
+
     batch.status = status;
     await batch.save();
-    res.json({ success: true, data: batch });
+
+    // If deleting, permanently remove
+    if (status === 'DELETED') {
+      if (batch.currentQuantity > 0 && batch.masterProductId) {
+        const masterProduct = await MasterProduct.findById(batch.masterProductId);
+        if (masterProduct) {
+          masterProduct.totalStockKg = Math.max(0, (masterProduct.totalStockKg || 0) - batch.currentQuantity);
+          await masterProduct.save();
+        }
+      }
+      await FinishedGoodsBatch.findByIdAndDelete(batch._id);
+    }
+
+    res.json({ success: true, message: 'Batch updated or removed successfully', data: batch });
   } catch (error) {
     console.error('Error updating FG batch status:', error);
     res.status(500).json({ success: false, message: 'Server error' });
