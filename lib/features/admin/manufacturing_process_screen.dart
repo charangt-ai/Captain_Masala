@@ -72,6 +72,7 @@ class _ManufacturingProcessScreenState extends State<ManufacturingProcessScreen>
   @override
   List<ProductionPlan> _approvedPlans = [];
   bool _isLoadingPlans = false;
+  double _selectedPlanSize = 0.0;
   
   void initState() {
     super.initState();
@@ -137,6 +138,13 @@ class _ManufacturingProcessScreenState extends State<ManufacturingProcessScreen>
         _batch.targetProductName = recipeData['masterProductName'];
         _batch.planNumber = recipeData['planNumber'];
         _batch.productionPlanId = planId;
+        _selectedPlanSize = (recipeData['plannedBatchSize'] as num?)?.toDouble() ?? 0.0;
+        if (_selectedPlanSize == 0.0) {
+          final matchedPlan = _approvedPlans.where((p) => p.id == planId).toList();
+          if (matchedPlan.isNotEmpty) {
+            _selectedPlanSize = matchedPlan.first.plannedBatchSize;
+          }
+        }
         
         // Clear existing and add from recipe
         for (var c in _rawMaterialsList) { c.dispose(); }
@@ -420,6 +428,25 @@ class _ManufacturingProcessScreenState extends State<ManufacturingProcessScreen>
                      return;
                   }
                 }
+
+                // Validation: Raw materials weight must match Production Plan weight
+                final totalRawWeight = _batch.totalRawMaterialQuantity;
+                if (_selectedPlanSize > 0) {
+                  final diff = (totalRawWeight - _selectedPlanSize).abs();
+                  if (diff > 0.01) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          'Weight mismatch! Total raw materials (${totalRawWeight.toStringAsFixed(2)} kg) does not match Production Plan weight (${_selectedPlanSize.toStringAsFixed(2)} kg).',
+                        ),
+                        backgroundColor: Colors.red.shade800,
+                        duration: const Duration(seconds: 4),
+                      ),
+                    );
+                    return;
+                  }
+                }
+
                 // Backward compatibility just in case
                 _batch.rawMaterialName = _batch.rawMaterials.map((e) => e.name).join(', ');
                 _batch.rawMaterialQuantity = _batch.totalRawMaterialQuantity;
@@ -602,6 +629,46 @@ class _ManufacturingProcessScreenState extends State<ManufacturingProcessScreen>
                           foregroundColor: Theme.of(context).primaryColor,
                         ),
                       ),
+
+                      if (_selectedPlanSize > 0)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8.0),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: (_batch.totalRawMaterialQuantity - _selectedPlanSize).abs() <= 0.01
+                                  ? Colors.green.shade50
+                                  : Colors.amber.shade50,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: (_batch.totalRawMaterialQuantity - _selectedPlanSize).abs() <= 0.01
+                                    ? Colors.green.shade300
+                                    : Colors.amber.shade400,
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  'Total Raw Materials: ${_batch.totalRawMaterialQuantity.toStringAsFixed(2)} kg',
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                ),
+                                Text(
+                                  (_batch.totalRawMaterialQuantity - _selectedPlanSize).abs() <= 0.01
+                                      ? '✓ Matches Plan (${_selectedPlanSize.toStringAsFixed(1)} kg)'
+                                      : 'Plan: ${_selectedPlanSize.toStringAsFixed(1)} kg (${(_batch.totalRawMaterialQuantity - _selectedPlanSize > 0 ? "+" : "")}${(_batch.totalRawMaterialQuantity - _selectedPlanSize).toStringAsFixed(2)} kg)',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12,
+                                    color: (_batch.totalRawMaterialQuantity - _selectedPlanSize).abs() <= 0.01
+                                        ? Colors.green.shade800
+                                        : Colors.amber.shade900,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
                       
                       if ((_batch.totalCost) > 0)
                         Padding(

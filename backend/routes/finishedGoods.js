@@ -372,20 +372,14 @@ router.get('/allocations/by-manufacturing-batch/:id', protect, async (req, res) 
     const PackagingAllocation = require('../models/PackagingAllocation');
     const ManufacturingBatch = require('../models/ManufacturingBatch');
     
-    // Strategy 1: Find FinishedGoodsBatch directly linked to this manufacturingBatchId
+    // Strategy 1: Find FinishedGoodsBatch directly linked to this specific manufacturingBatchId
     let fgBatches = await FinishedGoodsBatch.find({ manufacturingBatchId: req.params.id });
 
     // Strategy 2: If not found, check if manufacturing batch has a productionPlanId
     if (!fgBatches || fgBatches.length === 0) {
       const mBatch = await ManufacturingBatch.findById(req.params.id);
-      if (mBatch) {
-        if (mBatch.productionPlanId) {
-          fgBatches = await FinishedGoodsBatch.find({ productionPlanId: mBatch.productionPlanId });
-        }
-        // Strategy 3: Match by master product if still empty
-        if ((!fgBatches || fgBatches.length === 0) && mBatch.targetProductId) {
-          fgBatches = await FinishedGoodsBatch.find({ masterProductId: mBatch.targetProductId });
-        }
+      if (mBatch && mBatch.productionPlanId) {
+        fgBatches = await FinishedGoodsBatch.find({ productionPlanId: mBatch.productionPlanId });
       }
     }
 

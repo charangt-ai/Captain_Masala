@@ -84,6 +84,10 @@ class _ManageRecipesScreenState extends State<ManageRecipesScreen> {
     });
   }
 
+  double get _totalIngredientsWeight {
+    return _ingredients.fold(0.0, (sum, item) => sum + item.requiredQuantity);
+  }
+
   Future<void> _saveRecipe() async {
     if (_ingredients.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Add at least one ingredient')));
@@ -93,6 +97,21 @@ class _ManageRecipesScreenState extends State<ManageRecipesScreen> {
     final batchSize = double.tryParse(_batchSizeController.text) ?? 0;
     if (batchSize <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Invalid batch size')));
+      return;
+    }
+
+    final totalWeight = _totalIngredientsWeight;
+    final diff = (totalWeight - batchSize).abs();
+    if (diff > 0.01) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Weight mismatch! Total raw materials weight (${totalWeight.toStringAsFixed(2)} kg) must equal Base Batch Size (${batchSize.toStringAsFixed(2)} kg).',
+          ),
+          backgroundColor: Colors.red.shade800,
+          duration: const Duration(seconds: 4),
+        ),
+      );
       return;
     }
 
@@ -182,6 +201,54 @@ class _ManageRecipesScreenState extends State<ManageRecipesScreen> {
                         onPressed: _showAddMaterialDialog,
                       )
                     ],
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: () {
+                        final batchSize = double.tryParse(_batchSizeController.text) ?? 0.0;
+                        final matches = (batchSize > 0) && ((_totalIngredientsWeight - batchSize).abs() <= 0.01);
+                        return matches ? Colors.green.shade50 : Colors.amber.shade50;
+                      }(),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: () {
+                          final batchSize = double.tryParse(_batchSizeController.text) ?? 0.0;
+                          final matches = (batchSize > 0) && ((_totalIngredientsWeight - batchSize).abs() <= 0.01);
+                          return matches ? Colors.green.shade300 : Colors.amber.shade400;
+                        }(),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Total Materials: ${_totalIngredientsWeight.toStringAsFixed(2)} kg',
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                        ),
+                        Text(
+                          () {
+                            final batchSize = double.tryParse(_batchSizeController.text) ?? 0.0;
+                            final diff = _totalIngredientsWeight - batchSize;
+                            if (batchSize <= 0) return 'Set batch size';
+                            if (diff.abs() <= 0.01) return '✓ Balanced with Batch Size';
+                            if (diff < 0) return 'Need ${(batchSize - _totalIngredientsWeight).toStringAsFixed(2)} kg more';
+                            return '${diff.toStringAsFixed(2)} kg excess';
+                          }(),
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: () {
+                              final batchSize = double.tryParse(_batchSizeController.text) ?? 0.0;
+                              return (batchSize > 0 && (_totalIngredientsWeight - batchSize).abs() <= 0.01)
+                                  ? Colors.green.shade800
+                                  : Colors.amber.shade900;
+                            }(),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                   const Divider(),
                   Expanded(
