@@ -1254,20 +1254,25 @@ class DatabaseService extends ChangeNotifier {
     }
   }
 
-  Future<bool> deleteFinishedGoodsBatch(String fgBatchId) async {
+  Future<Map<String, dynamic>> deleteFinishedGoodsBatch(String fgBatchId) async {
     try {
       final res = await http.delete(
         Uri.parse('${ApiConfig.baseUrl}/finished-goods/$fgBatchId'),
         headers: await _getHeaders(),
       );
       if (res.statusCode == 200) {
-        return true;
+        return {'success': true};
       }
       debugPrint('Failed to delete FG batch: ${res.statusCode} ${res.body}');
-      return false;
+      String msg = 'Failed with status ${res.statusCode}';
+      try {
+        final decoded = json.decode(res.body);
+        if (decoded['message'] != null) msg = decoded['message'];
+      } catch (_) {}
+      return {'success': false, 'message': msg};
     } catch (e) {
       debugPrint('Error deleting finished goods batch: $e');
-      return false;
+      return {'success': false, 'message': e.toString()};
     }
   }
 

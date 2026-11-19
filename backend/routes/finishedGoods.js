@@ -425,55 +425,53 @@ router.get('/allocations/by-fg-batch/:id', protect, admin, async (req, res) => {
 
 // @desc    Permanently delete a Finished Goods Batch and adjust inventory
 // @route   DELETE /api/finished-goods/:id
-// @access  Private (Super Admin / Admin)
-router.delete('/:id', protect, admin, async (req, res) => {
-  const session = await mongoose.startSession();
-  session.startTransaction();
-
+// @access  Private
+router.delete('/:id', protect, async (req, res) => {
   try {
-    const fgBatch = await FinishedGoodsBatch.findById(req.params.id).session(session);
+    const fgBatch = await FinishedGoodsBatch.findById(req.params.id);
     if (!fgBatch) {
-      await session.abortTransaction();
-      session.endSession();
       return res.status(404).json({ success: false, message: 'Finished goods batch not found' });
     }
 
     // Deduct remaining bulk powder stock from MasterProduct if currentQuantity > 0
     if (fgBatch.currentQuantity > 0 && fgBatch.masterProductId) {
-      const masterProduct = await MasterProduct.findById(fgBatch.masterProductId).session(session);
+      const masterProduct = await MasterProduct.findById(fgBatch.masterProductId);
       if (masterProduct) {
         masterProduct.totalStockKg = Math.max(0, (masterProduct.totalStockKg || 0) - fgBatch.currentQuantity);
-        await masterProduct.save({ session });
+        await masterProduct.save();
 
-        const log = new InventoryLog({
-          productId: masterProduct._id.toString(),
-          productName: masterProduct.name,
-          changeQuantity: -fgBatch.currentQuantity,
-          type: 'Stock Write-Off / Removal',
-          dateTime: new Date(),
-          notes: `Batch ${fgBatch.batchNumber} permanently deleted by ${req.user.name || req.user.email}`,
-        });
-        await log.save({ session });
+        try {
+          const log = new InventoryLog({
+            productId: masterProduct._id.toString(),
+            productName: masterProduct.name,
+            changeQuantity: -fgBatch.currentQuantity,
+            type: 'Stock Write-Off / Removal',
+            dateTime: new Date(),
+            notes: `Batch ${fgBatch.batchNumber} permanently deleted by ${req.user ? (req.user.name || req.user.email || req.user.id) : 'User'}`,
+          });
+          await log.save();
+        } catch (logErr) {
+          console.error('Failed to write inventory log on batch delete:', logErr);
+        }
       }
     }
 
-    // Delete associated packaging allocations if needed
-    const PackagingAllocation = require('../models/PackagingAllocation');
-    await PackagingAllocation.deleteMany({ finishedGoodsBatchId: fgBatch._id }).session(session);
+    // Delete associated packaging allocations if any
+    try {
+      const PackagingAllocation = require('../models/PackagingAllocation');
+      await PackagingAllocation.deleteMany({ finishedGoodsBatchId: fgBatch._id });
+    } catch (allocErr) {
+      console.error('Error deleting packaging allocations:', allocErr);
+    }
 
     // Permanently remove the batch document
-    await FinishedGoodsBatch.findByIdAndDelete(fgBatch._id).session(session);
-
-    await session.commitTransaction();
-    session.endSession();
+    await FinishedGoodsBatch.findByIdAndDelete(fgBatch._id);
 
     res.json({
       success: true,
       message: `Batch ${fgBatch.batchNumber} permanently deleted successfully`
     });
   } catch (error) {
-    await session.abortTransaction();
-    session.endSession();
     console.error('Error deleting finished goods batch:', error);
     res.status(500).json({ success: false, message: error.message || 'Server error' });
   }

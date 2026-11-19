@@ -126,10 +126,10 @@ class _FinishedGoodsScreenState extends State<FinishedGoodsScreen> with SingleTi
     if (confirmed == true && batch.id != null) {
       setState(() => _isLoading = true);
       final db = Provider.of<DatabaseService>(context, listen: false);
-      final success = await db.deleteFinishedGoodsBatch(batch.id!);
+      final result = await db.deleteFinishedGoodsBatch(batch.id!);
       
       if (!mounted) return;
-      if (success) {
+      if (result['success'] == true) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Batch ${batch.batchNumber} deleted permanently.'),
@@ -140,8 +140,8 @@ class _FinishedGoodsScreenState extends State<FinishedGoodsScreen> with SingleTi
       } else {
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Failed to delete batch. Please try again.'),
+          SnackBar(
+            content: Text('Failed to delete batch: ${result['message']}'),
             backgroundColor: Colors.red,
           ),
         );
