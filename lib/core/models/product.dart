@@ -4,6 +4,7 @@ class Product {
   final String packSize; // e.g. "500 g"
   double wholesalePrice;
   double originalPrice;
+  double costPrice; // Manufacturing / Procurement cost per unit
   double remainingStock; // in kg/units
   final String imageUrl;
   bool isEnabled;
@@ -16,6 +17,7 @@ class Product {
     required this.packSize,
     required this.wholesalePrice,
     this.originalPrice = 0.0,
+    this.costPrice = 0.0,
     required this.remainingStock,
     this.imageUrl = '',
     this.isEnabled = true,
@@ -29,6 +31,7 @@ class Product {
     String? packSize,
     double? wholesalePrice,
     double? originalPrice,
+    double? costPrice,
     double? remainingStock,
     String? imageUrl,
     bool? isEnabled,
@@ -41,6 +44,7 @@ class Product {
       packSize: packSize ?? this.packSize,
       wholesalePrice: wholesalePrice ?? this.wholesalePrice,
       originalPrice: originalPrice ?? this.originalPrice,
+      costPrice: costPrice ?? this.costPrice,
       remainingStock: remainingStock ?? this.remainingStock,
       imageUrl: imageUrl ?? this.imageUrl,
       isEnabled: isEnabled ?? this.isEnabled,
@@ -56,6 +60,7 @@ class Product {
       'packSize': packSize,
       'wholesalePrice': wholesalePrice,
       'originalPrice': originalPrice,
+      'costPrice': costPrice,
       'remainingStock': remainingStock,
       'imageUrl': imageUrl,
       'isEnabled': isEnabled ? 1 : 0,
@@ -70,7 +75,8 @@ class Product {
       name: map['name'],
       packSize: map['packSize'],
       wholesalePrice: (map['wholesalePrice'] as num).toDouble(),
-      originalPrice: (map['originalPrice'] ?? map['wholesalePrice']).toDouble(),
+      originalPrice: (map['originalPrice'] ?? map['wholesalePrice'] ?? 0.0).toDouble(),
+      costPrice: (map['costPrice'] ?? 0.0).toDouble(),
       remainingStock: (map['remainingStock'] as num).toDouble(),
       imageUrl: map['imageUrl'] ?? '',
       isEnabled: map['isEnabled'] == 1 || map['isEnabled'] == true,

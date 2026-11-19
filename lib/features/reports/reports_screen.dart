@@ -13,6 +13,7 @@ import '../../core/models/sale.dart';
 import '../../core/models/app_user.dart';
 import 'inventory_deduction_report.dart';
 import 'sales_report_pdf_generator.dart';
+import 'sales_profit_screen.dart';
 
 class ReportsScreen extends StatefulWidget {
   final bool isEmbedded;
@@ -215,42 +216,84 @@ class _ReportsScreenState extends State<ReportsScreen> {
   }
 
   Widget _buildInteractiveReportCard(BuildContext context) {
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: InkWell(
-        onTap: () {
-          Navigator.push(context, MaterialPageRoute(builder: (_) => const InventoryDeductionReportScreen()));
-        },
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: AppColors.primaryRed.withOpacity(0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.inventory_2, color: AppColors.primaryRed, size: 28),
+    return Column(
+      children: [
+        Card(
+          elevation: 2,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          child: InkWell(
+            onTap: () {
+              Navigator.push(context, MaterialPageRoute(builder: (_) => const SalesProfitScreen()));
+            },
+            borderRadius: BorderRadius.circular(16),
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.green.shade50,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(Icons.trending_up, color: Colors.green.shade700, size: 28),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: const [
+                        Text('Sales & Profit Analysis', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.textDark)),
+                        SizedBox(height: 4),
+                        Text('Product cost price, selling price, profit & margins', style: TextStyle(color: AppColors.textLight, fontSize: 13)),
+                      ],
+                    ),
+                  ),
+                  const Icon(Icons.arrow_forward_ios, color: AppColors.textLight, size: 16),
+                ],
               ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: const [
-                    Text('Inventory Deduction Report', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.textDark)),
-                    SizedBox(height: 4),
-                    Text('Daily summary of stock sold by variant', style: TextStyle(color: AppColors.textLight, fontSize: 13)),
-                  ],
-                ),
-              ),
-              const Icon(Icons.arrow_forward_ios, color: AppColors.textLight, size: 16),
-            ],
+            ),
           ),
         ),
-      ),
+        const SizedBox(height: 12),
+        Card(
+          elevation: 2,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          child: InkWell(
+            onTap: () {
+              Navigator.push(context, MaterialPageRoute(builder: (_) => const InventoryDeductionReportScreen()));
+            },
+            borderRadius: BorderRadius.circular(16),
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppColors.primaryRed.withOpacity(0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.inventory_2, color: AppColors.primaryRed, size: 28),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: const [
+                        Text('Inventory Deduction Report', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.textDark)),
+                        SizedBox(height: 4),
+                        Text('Daily summary of stock sold by variant', style: TextStyle(color: AppColors.textLight, fontSize: 13)),
+                      ],
+                    ),
+                  ),
+                  const Icon(Icons.arrow_forward_ios, color: AppColors.textLight, size: 16),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 

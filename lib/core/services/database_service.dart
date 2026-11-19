@@ -229,6 +229,7 @@ class DatabaseService extends ChangeNotifier {
         packSize: json['packSize'],
         wholesalePrice: (json['wholesalePrice'] ?? 0).toDouble(),
         originalPrice: (json['originalPrice'] ?? 0).toDouble(),
+        costPrice: (json['costPrice'] ?? 0).toDouble(),
         remainingStock: (json['remainingStock'] ?? 0).toDouble(),
         imageUrl: json['imageUrl'] ?? '',
         isEnabled: json['isEnabled'] ?? true,

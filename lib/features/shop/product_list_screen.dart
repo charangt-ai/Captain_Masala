@@ -216,6 +216,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
     final packSizeController = TextEditingController(text: product?.packSize ?? widget.category.name);
     final wholesalePriceController = TextEditingController(text: product?.wholesalePrice.toString() ?? '');
     final originalPriceController = TextEditingController(text: product?.originalPrice.toString() ?? '');
+    final costPriceController = TextEditingController(text: product?.costPrice.toString() ?? '');
     final stockController = TextEditingController(text: product?.remainingStock.toString() ?? '100');
     
     File? selectedImage;
@@ -288,6 +289,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
                     TextField(controller: packSizeController, decoration: const InputDecoration(labelText: 'Pack Size (e.g. 50g)')),
                     TextField(controller: wholesalePriceController, decoration: const InputDecoration(labelText: 'Selling Price (Rs)'), keyboardType: TextInputType.number),
                     TextField(controller: originalPriceController, decoration: const InputDecoration(labelText: 'Original Price (Rs)'), keyboardType: TextInputType.number),
+                    TextField(controller: costPriceController, decoration: const InputDecoration(labelText: 'Cost Price (Rs) [Cost to Make/Procure]'), keyboardType: TextInputType.number),
                     TextField(controller: stockController, decoration: const InputDecoration(labelText: 'Stock Quantity'), keyboardType: TextInputType.number),
                   ],
                 ),
@@ -360,6 +362,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
                       packSize: packSizeController.text.trim(),
                       wholesalePrice: double.tryParse(wholesalePriceController.text.trim()) ?? 0.0,
                       originalPrice: double.tryParse(originalPriceController.text.trim()) ?? 0.0,
+                      costPrice: double.tryParse(costPriceController.text.trim()) ?? 0.0,
                       remainingStock: double.tryParse(stockController.text.trim()) ?? 0.0,
                       categoryId: widget.category.id, // Enforce category attachment
                       isEnabled: product?.isEnabled ?? true,

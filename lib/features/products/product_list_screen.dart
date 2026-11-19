@@ -21,6 +21,7 @@ class ProductListScreen extends StatelessWidget {
     final packSizeController = TextEditingController(text: product?.packSize ?? '500 g');
     final priceController = TextEditingController(text: product?.wholesalePrice.toString() ?? '');
     final originalPriceController = TextEditingController(text: product?.originalPrice.toString() ?? '');
+    final costPriceController = TextEditingController(text: product?.costPrice.toString() ?? '');
     final stockController = TextEditingController(text: product?.remainingStock.toString() ?? '0.0');
     final formKey = GlobalKey<FormState>();
 
@@ -78,6 +79,12 @@ class ProductListScreen extends StatelessWidget {
                         keyboardType: const TextInputType.numberWithOptions(decimal: true),
                       ),
                       const SizedBox(height: 12),
+                      TextFormField(
+                        controller: costPriceController,
+                        decoration: const InputDecoration(labelText: 'Cost Price (₹) [Cost to Produce/Procure]'),
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      ),
+                      const SizedBox(height: 12),
                       DropdownButtonFormField<ProductCategory>(
                         value: selectedCategory,
                         decoration: const InputDecoration(labelText: 'Category'),
@@ -104,6 +111,7 @@ class ProductListScreen extends StatelessWidget {
                     if (!formKey.currentState!.validate()) return;
                     
                     final originalPrice = double.tryParse(originalPriceController.text) ?? 0.0;
+                    final costPrice = double.tryParse(costPriceController.text) ?? 0.0;
                     if (isEdit) {
                       final updated = Product(
                         id: product.id,
@@ -111,6 +119,7 @@ class ProductListScreen extends StatelessWidget {
                         packSize: packSizeController.text,
                         wholesalePrice: double.parse(priceController.text),
                         originalPrice: originalPrice,
+                        costPrice: costPrice,
                         remainingStock: product.remainingStock,
                         isEnabled: product.isEnabled,
                         imageUrl: product.imageUrl,
@@ -131,6 +140,7 @@ class ProductListScreen extends StatelessWidget {
                         packSize: packSizeController.text.trim(),
                         wholesalePrice: double.parse(priceController.text),
                         originalPrice: originalPrice,
+                        costPrice: costPrice,
                         remainingStock: 0.0, // Stock is driven by production/ledger
                         masterProductId: masterId,
                         categoryId: selectedCategory?.id ?? '',
