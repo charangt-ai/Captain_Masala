@@ -28,18 +28,27 @@ class _ManageRecipesScreenState extends State<ManageRecipesScreen> {
   }
 
   Future<void> _loadRecipe() async {
-    final db = Provider.of<DatabaseService>(context, listen: false);
-    final recipeData = await db.fetchRecipe(widget.product.id);
-    
-    if (mounted) {
-      if (recipeData != null) {
-        setState(() {
-          _currentRecipe = Recipe.fromJson(recipeData);
-          _batchSizeController.text = _currentRecipe!.baseBatchSize.toString();
-          _ingredients = List.from(_currentRecipe!.ingredients);
-          _isLoading = false;
-        });
-      } else {
+    try {
+      final db = Provider.of<DatabaseService>(context, listen: false);
+      final recipeData = await db.fetchRecipe(widget.product.id);
+      
+      if (mounted) {
+        if (recipeData != null) {
+          setState(() {
+            _currentRecipe = Recipe.fromJson(recipeData);
+            _batchSizeController.text = _currentRecipe!.baseBatchSize.toString();
+            _ingredients = List.from(_currentRecipe!.ingredients);
+            _isLoading = false;
+          });
+        } else {
+          setState(() {
+            _isLoading = false;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error in _loadRecipe: $e');
+      if (mounted) {
         setState(() {
           _isLoading = false;
         });

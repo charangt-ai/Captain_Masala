@@ -12,10 +12,22 @@ class RecipeIngredient {
   });
 
   factory RecipeIngredient.fromJson(Map<String, dynamic> json) {
+    String id = '';
+    String name = 'Unknown';
+
+    final rawMat = json['rawMaterialId'];
+    if (rawMat is Map) {
+      id = rawMat['_id']?.toString() ?? '';
+      name = rawMat['name']?.toString() ?? 'Unknown';
+    } else if (rawMat != null) {
+      id = rawMat.toString();
+      name = json['rawMaterialName']?.toString() ?? 'Unknown';
+    }
+
     return RecipeIngredient(
-      rawMaterialId: json['rawMaterialId']['_id'] ?? json['rawMaterialId'],
-      rawMaterialName: json['rawMaterialId']['name'] ?? 'Unknown',
-      requiredQuantity: (json['requiredQuantity'] as num).toDouble(),
+      rawMaterialId: id,
+      rawMaterialName: name,
+      requiredQuantity: (json['requiredQuantity'] as num?)?.toDouble() ?? 0.0,
     );
   }
 

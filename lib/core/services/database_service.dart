@@ -1152,11 +1152,12 @@ class DatabaseService extends ChangeNotifier {
       final res = await http.get(
         Uri.parse('${ApiConfig.baseUrl}/recipes/$productId'),
         headers: await _getHeaders(),
-      );
+      ).timeout(const Duration(seconds: 8));
+
       if (res.statusCode == 200) {
         return json.decode(res.body)['data'];
       }
-      debugPrint('Fetch recipe failed: ${res.body}');
+      debugPrint('Fetch recipe failed: ${res.statusCode} ${res.body}');
       return null;
     } catch (e) {
       debugPrint('Error fetching recipe: $e');

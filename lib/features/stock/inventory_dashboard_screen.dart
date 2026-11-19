@@ -24,8 +24,8 @@ class InventoryDashboardScreen extends StatelessWidget {
         children: [
           // STAGE 1: PROCUREMENT & MASTER DATA
           _buildStageHeader(
-            '1. Procurement & Formulations',
-            'Raw materials stock, vendor suppliers & master spice recipes',
+            '1. Raw Materials & Formulations',
+            'Warehouse inventory stock & master spice recipes',
             Icons.inventory_outlined,
             Colors.teal,
           ),
@@ -55,30 +55,6 @@ class InventoryDashboardScreen extends StatelessWidget {
                 accentColor: Colors.teal.shade700,
                 onTap: () {
                   Navigator.of(context).push(MaterialPageRoute(builder: (_) => const RecipeProductSelectorScreen()));
-                },
-              ),
-              _buildModernCard(
-                context,
-                title: 'Purchase Entry',
-                subtitle: 'Inward lot arrivals',
-                icon: Icons.add_shopping_cart,
-                accentColor: Colors.green.shade700,
-                onTap: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Purchase Inward Entry module is opening...')),
-                  );
-                },
-              ),
-              _buildModernCard(
-                context,
-                title: 'Suppliers',
-                subtitle: 'Vendor directory & GST',
-                icon: Icons.local_shipping,
-                accentColor: Colors.blue.shade700,
-                onTap: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Supplier Management module is opening...')),
-                  );
                 },
               ),
             ],
