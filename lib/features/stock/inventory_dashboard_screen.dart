@@ -1,13 +1,11 @@
 import 'package:flutter/material.dart';
 import 'raw_material_stock_screen.dart';
 import '../production/production_plan_list_screen.dart';
-import '../production/material_issue_screen.dart';
 import '../production/quality_control_screen.dart';
 import '../production/finished_goods_screen.dart';
-import '../production/batch_costing_screen.dart';
 import '../production/recipe_product_selector_screen.dart';
 import '../admin/manufacturing_process_screen.dart';
-import '../production/stock_approval_screen.dart';
+
 class InventoryDashboardScreen extends StatelessWidget {
   const InventoryDashboardScreen({Key? key}) : super(key: key);
 
@@ -102,7 +100,7 @@ class InventoryDashboardScreen extends StatelessWidget {
 
           const SizedBox(height: 24),
 
-          // STAGE 3: QUALITY CONTROL & PACKAGING ALLOCATION
+          // STAGE 3: QUALITY CONTROL & BULK PACKAGING
           _buildStageHeader(
             '3. Quality, Bulk & Packaging',
             'Laboratory checks, bulk storage & packaging allocation',
@@ -135,46 +133,6 @@ class InventoryDashboardScreen extends StatelessWidget {
                 accentColor: Colors.indigo.shade700,
                 onTap: () {
                   Navigator.of(context).push(MaterialPageRoute(builder: (_) => const FinishedGoodsScreen()));
-                },
-              ),
-              _buildModernCard(
-                context,
-                title: 'Stock Approvals',
-                subtitle: 'Retail packaging sign-off',
-                icon: Icons.gavel,
-                accentColor: Colors.redAccent.shade700,
-                onTap: () {
-                  Navigator.of(context).push(MaterialPageRoute(builder: (_) => const StockApprovalScreen()));
-                },
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 24),
-
-          // STAGE 4: FINANCIAL AUDITING & COSTING
-          _buildStageHeader(
-            '4. Financial & Margin Analysis',
-            'Executive per-kg batch costing & profitability',
-            Icons.analytics_outlined,
-            Colors.brown,
-          ),
-          GridView.count(
-            crossAxisCount: 2,
-            crossAxisSpacing: 12,
-            mainAxisSpacing: 12,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            childAspectRatio: 1.15,
-            children: [
-              _buildModernCard(
-                context,
-                title: 'Batch Costing',
-                subtitle: 'Per-KG cost & margins',
-                icon: Icons.request_quote,
-                accentColor: Colors.brown.shade800,
-                onTap: () {
-                  Navigator.of(context).push(MaterialPageRoute(builder: (_) => const BatchCostingScreen()));
                 },
               ),
             ],
